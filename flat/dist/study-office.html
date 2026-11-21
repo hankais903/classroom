@@ -206,11 +206,11 @@ const SUBJ = {
 };
 // desk + chair cut-outs, where the cat sits, where she walks to first, where the tag floats
 const DESKS = [
-  { s: "國文", desk: "desk1", chair: "chair1", seat: [418, 757], stand: [410, 874], tag: [470, 574] },
-  { s: "英文", desk: "desk2", chair: "chair2", seat: [779, 633], stand: [772, 724], tag: [848, 462] },
-  { s: "數學", desk: "desk3", chair: "chair3", seat: [832, 830], stand: [702, 906], tag: [882, 641] },
-  { s: "社會", desk: "desk4", chair: "chair4", seat: [1109, 690], stand: [1100, 802], tag: [1152, 514] },
-  { s: "自然", desk: "desk5", chair: "chair5", seat: [1425, 775], stand: [1415, 906], tag: [1476, 590] }
+  { s: "國文", desk: "desk1", chair: "chair1", seat: [418, 790], stand: [410, 874], tag: [470, 574] },
+  { s: "英文", desk: "desk2", chair: "chair2", seat: [779, 666], stand: [772, 724], tag: [848, 462] },
+  { s: "數學", desk: "desk3", chair: "chair3", seat: [832, 863], stand: [702, 906], tag: [882, 641] },
+  { s: "社會", desk: "desk4", chair: "chair4", seat: [1109, 723], stand: [1100, 802], tag: [1152, 514] },
+  { s: "自然", desk: "desk5", chair: "chair5", seat: [1425, 808], stand: [1415, 906], tag: [1476, 590] }
 ];
 // floor footprints the cat cannot walk through
 const BLOCK = [
@@ -292,7 +292,7 @@ const SPR = {
 };
 const cat = { x: START[0], y: START[1], path: [], onArrive: null, mode: "stand", face: "front", flip: false, phase: 0, idle: 0, desk: null, perch: null, hop: null, cheer: 0 };
 let marker = null;
-const catH = y => 104 + (y - 455) * .12;
+const catH = y => 208 + (y - 455) * .24;
 function walkTo(x, y, cb) {
   leaveSeat();
   const p = smooth(astar(cat.x, cat.y, x, y));
@@ -443,7 +443,7 @@ function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
   // movement
   if (cat.mode === "walk" && cat.path.length) {
-    const [tx, ty] = cat.path[0], dx = tx - cat.x, dy = ty - cat.y, d = Math.hypot(dx, dy), step = 165 * dt * (catH(cat.y) / 130);
+    const [tx, ty] = cat.path[0], dx = tx - cat.x, dy = ty - cat.y, d = Math.hypot(dx, dy), step = 165 * dt * (catH(cat.y) / 260);
     if (d > .01) { if (Math.abs(dx) > Math.abs(dy) * .8) { cat.face = "side"; cat.flip = dx > 0; } else cat.face = dy > 0 ? "front" : "back"; }
     if (d <= step) { cat.x = tx; cat.y = ty; cat.phase += d; cat.path.shift(); if (!cat.path.length) { marker = null; cat.mode = "stand"; cat.face = "front"; const cb = cat.onArrive; cat.onArrive = null; if (cb) cb(); } }
     else { cat.x += dx / d * step; cat.y += dy / d * step; cat.phase += step; }
@@ -454,11 +454,11 @@ function frame(now) {
   } else if (cat.mode === "stand") cat.idle += dt;
   // parrot
   if (owns("pet")) {
-    const side = cat.flip ? -1 : 1, H = catH(cat.y), bx = cat.desk ? cat.desk.seat[0] : cat.x, by = cat.desk ? cat.desk.seat[1] : cat.y, gx = bx - side * H * .6, gy = by - H * 1.05 + Math.sin(t * 2.2) * 6;
+    const side = cat.flip ? -1 : 1, H = catH(cat.y), bx = cat.desk ? cat.desk.seat[0] : cat.x, by = cat.desk ? cat.desk.seat[1] : cat.y, gx = bx - side * H * .38, gy = by - H * (cat.desk ? .75 : .95) + Math.sin(t * 2.2) * 6;
     pet.x += (gx - pet.x) * Math.min(1, dt * 3); pet.y += (gy - pet.y) * Math.min(1, dt * 3);
   }
   // camera follows the cat unless the player just dragged
-  if (now - userPanned > 2500) { const k = Math.min(1, dt * 2.2); vcx += (cat.x - vcx) * k; vcy += (cat.y - 60 - vcy) * k; clampView(); }
+  if (now - userPanned > 2500) { const k = Math.min(1, dt * 2.2); vcx += (cat.x - vcx) * k; vcy += (cat.y - 120 - vcy) * k; clampView(); }
 
   // ---- draw ----
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = "#f6d9cc"; ctx.fillRect(0, 0, cv.width, cv.height);
@@ -482,7 +482,7 @@ function frame(now) {
     ctx.restore();
     if (cat.desk) drawCat(now, t);
   }
-  if (owns("pet")) drawParrot(pet.x, pet.y, catH(cat.y) / 130 * 1.1, t, cat.flip);
+  if (owns("pet")) drawParrot(pet.x, pet.y, catH(cat.y) / 260 * 1.5, t, cat.flip);
   if (owns("stars")) {
     ctx.save(); ctx.fillStyle = "#ffe48a"; ctx.shadowColor = "rgba(255,220,120,.9)"; ctx.shadowBlur = 8;
     stars.forEach(s => { if (!reduceMotion) { s.y += dt * 14 * s.v; s.x += Math.sin(t * .8 + s.p) * dt * 8; if (s.y > IH * .9) { s.y = -20; s.x = Math.random() * IW; } } drawStar4(s.x, s.y, 7 * s.s, .4 + .45 * (Math.sin(t * 2.4 + s.p) * .5 + .5)); });
@@ -496,7 +496,8 @@ function frame(now) {
 function drawCat(now, t) {
   const name = catSprite(now), S = SPR[name], im = IMG["cat_" + name];
   let x = cat.x, y = cat.y, H = catH(cat.desk ? cat.desk.stand[1] : cat.perch ? cat.perch.go[1] : cat.y);
-  if (cat.desk) { x = cat.desk.seat[0]; y = cat.desk.seat[1]; H *= .86; }
+  if (cat.desk) { x = cat.desk.seat[0]; y = cat.desk.seat[1]; H *= .62; }
+  else if (cat.perch) H *= .7;
   const k = H / 290 * S.k, w = im.width * k, h = im.height * k;
   let lift = 0, rot = 0, sx = 1, sy = 1;
   if (cat.mode === "walk" && !reduceMotion) { lift = Math.abs(Math.sin(cat.phase * .075)) * 7; rot = Math.sin(cat.phase * .075) * .06; }
@@ -652,7 +653,7 @@ function tickClock() { const d = new Date(); $id("clock").textContent = `${Strin
   tickClock(); setInterval(tickClock, 15000);
   try { await loadAll(p => { $id("loadBar").style.width = `${Math.round(p * 100)}%`; }); }
   catch (e) { $id("loadT").textContent = "圖片載入失敗，請重新整理一次"; return; }
-  rebuildGrid(); resize(); vcx = cat.x; vcy = cat.y - 60; clampView();
+  rebuildGrid(); resize(); vcx = cat.x; vcy = cat.y - 120; clampView();
   refreshTags(); $id("loading").hidden = true; last = performance.now(); requestAnimationFrame(loop);
   await loadProgress();
   toast("喵～點書桌，貓咪就會走過去坐下來練習");
