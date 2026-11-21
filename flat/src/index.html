@@ -206,11 +206,11 @@ const SUBJ = {
 };
 // desk + chair cut-outs, where the cat sits, where she walks to first, where the tag floats
 const DESKS = [
-  { s: "國文", desk: "desk1", chair: "chair1", seat: [420, 740], stand: [410, 874], tag: [470, 574] },
-  { s: "英文", desk: "desk2", chair: "chair2", seat: [781, 616], stand: [772, 724], tag: [848, 462] },
-  { s: "數學", desk: "desk3", chair: "chair3", seat: [834, 813], stand: [702, 906], tag: [882, 641] },
-  { s: "社會", desk: "desk4", chair: "chair4", seat: [1111, 673], stand: [1100, 802], tag: [1152, 514] },
-  { s: "自然", desk: "desk5", chair: "chair5", seat: [1427, 758], stand: [1415, 906], tag: [1476, 590] }
+  { s: "國文", desk: "desk1", chair: "chair1", seat: [418, 757], stand: [410, 874], tag: [470, 574] },
+  { s: "英文", desk: "desk2", chair: "chair2", seat: [779, 633], stand: [772, 724], tag: [848, 462] },
+  { s: "數學", desk: "desk3", chair: "chair3", seat: [832, 830], stand: [702, 906], tag: [882, 641] },
+  { s: "社會", desk: "desk4", chair: "chair4", seat: [1109, 690], stand: [1100, 802], tag: [1152, 514] },
+  { s: "自然", desk: "desk5", chair: "chair5", seat: [1425, 775], stand: [1415, 906], tag: [1476, 590] }
 ];
 // floor footprints the cat cannot walk through
 const BLOCK = [
@@ -292,7 +292,7 @@ const SPR = {
 };
 const cat = { x: START[0], y: START[1], path: [], onArrive: null, mode: "stand", face: "front", flip: false, phase: 0, idle: 0, desk: null, perch: null, hop: null, cheer: 0 };
 let marker = null;
-const catH = y => 80 + (y - 455) * .095;
+const catH = y => 104 + (y - 455) * .12;
 function walkTo(x, y, cb) {
   leaveSeat();
   const p = smooth(astar(cat.x, cat.y, x, y));
@@ -443,7 +443,7 @@ function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
   // movement
   if (cat.mode === "walk" && cat.path.length) {
-    const [tx, ty] = cat.path[0], dx = tx - cat.x, dy = ty - cat.y, d = Math.hypot(dx, dy), step = 190 * dt * (catH(cat.y) / 110);
+    const [tx, ty] = cat.path[0], dx = tx - cat.x, dy = ty - cat.y, d = Math.hypot(dx, dy), step = 165 * dt * (catH(cat.y) / 130);
     if (d > .01) { if (Math.abs(dx) > Math.abs(dy) * .8) { cat.face = "side"; cat.flip = dx > 0; } else cat.face = dy > 0 ? "front" : "back"; }
     if (d <= step) { cat.x = tx; cat.y = ty; cat.phase += d; cat.path.shift(); if (!cat.path.length) { marker = null; cat.mode = "stand"; cat.face = "front"; const cb = cat.onArrive; cat.onArrive = null; if (cb) cb(); } }
     else { cat.x += dx / d * step; cat.y += dy / d * step; cat.phase += step; }
@@ -482,7 +482,7 @@ function frame(now) {
     ctx.restore();
     if (cat.desk) drawCat(now, t);
   }
-  if (owns("pet")) drawParrot(pet.x, pet.y, catH(cat.y) / 110 * 1.2, t, cat.flip);
+  if (owns("pet")) drawParrot(pet.x, pet.y, catH(cat.y) / 130 * 1.1, t, cat.flip);
   if (owns("stars")) {
     ctx.save(); ctx.fillStyle = "#ffe48a"; ctx.shadowColor = "rgba(255,220,120,.9)"; ctx.shadowBlur = 8;
     stars.forEach(s => { if (!reduceMotion) { s.y += dt * 14 * s.v; s.x += Math.sin(t * .8 + s.p) * dt * 8; if (s.y > IH * .9) { s.y = -20; s.x = Math.random() * IW; } } drawStar4(s.x, s.y, 7 * s.s, .4 + .45 * (Math.sin(t * 2.4 + s.p) * .5 + .5)); });

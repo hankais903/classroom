@@ -28,12 +28,16 @@ for n,(x0,y0,x1,y1),base in OCC:
     lab,k=ndimage.label(m); 
     if k:
         sz=ndimage.sum(m,lab,range(1,k+1)); m=np.isin(lab,[i+1 for i,s in enumerate(sz) if s>=40])
-    m=ndimage.binary_dilation(m,iterations=1)
     for ex0,ey0,ex1,ey1 in EXCL.get(n,[]): m[ey0-y0:ey1-y0, ex0-x0:ex1-x0]=False
     if n in chairs:  # remove chair pixels from desk
         cx0,cy0,cx1,cy1=boxes[chairs[n]]
         # keep desk pixels in chair box only above chair backrest top+12
         sub=m[max(0,cy0-y0+14):cy1-y0, max(0,cx0-x0):cx1-x0]; sub[:]=False
+    if n.startswith('chair'):  # drop the strip of desk edge to the right of the backrest
+        x0f=[.655,.675,.665,.68,.66][int(n[-1])-1]; hh,ww=m.shape
+        yy,xx=np.mgrid[0:hh,0:ww]; fx=xx/ww; fy=yy/hh
+        m[(fx>x0f)&(fy<.32+(.39-.32)*(fx-x0f)/(1-x0f))]=False
+        m[fy<.035]=False
     a=Image.fromarray((m*255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.6))
     crop=src.crop((x0,y0,x1,y1)).convert('RGBA'); crop.putalpha(a); crop.save(f'occ_{n}.png')
     vis[y0:y1,x0:x1][m]=(vis[y0:y1,x0:x1][m]*0.4+np.array([0,90,255])*0.6).astype(np.uint8)
