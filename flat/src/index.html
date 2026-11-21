@@ -292,7 +292,8 @@ const SPR = {
 };
 const cat = { x: START[0], y: START[1], path: [], onArrive: null, mode: "stand", face: "front", flip: false, phase: 0, idle: 0, desk: null, perch: null, hop: null, cheer: 0 };
 let marker = null;
-const catH = y => 156 + (y - 455) * .18;
+// same perspective as the chairs: a chair is about 0.165 × (y + 113) px tall; the cat is ~1.45 chairs
+const catH = y => .239 * (y + 113);
 function walkTo(x, y, cb) {
   leaveSeat();
   const p = smooth(astar(cat.x, cat.y, x, y));
@@ -443,7 +444,7 @@ function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
   // movement
   if (cat.mode === "walk" && cat.path.length) {
-    const [tx, ty] = cat.path[0], dx = tx - cat.x, dy = ty - cat.y, d = Math.hypot(dx, dy), step = 165 * dt * (catH(cat.y) / 195);
+    const [tx, ty] = cat.path[0], dx = tx - cat.x, dy = ty - cat.y, d = Math.hypot(dx, dy), step = 165 * dt * (catH(cat.y) / 200);
     if (d > .01) { if (Math.abs(dx) > Math.abs(dy) * .8) { cat.face = "side"; cat.flip = dx > 0; } else cat.face = dy > 0 ? "front" : "back"; }
     if (d <= step) { cat.x = tx; cat.y = ty; cat.phase += d; cat.path.shift(); if (!cat.path.length) { marker = null; cat.mode = "stand"; cat.face = "front"; const cb = cat.onArrive; cat.onArrive = null; if (cb) cb(); } }
     else { cat.x += dx / d * step; cat.y += dy / d * step; cat.phase += step; }
@@ -495,9 +496,9 @@ function frame(now) {
 }
 function drawCat(now, t) {
   const name = catSprite(now), S = SPR[name], im = IMG["cat_" + name];
-  let x = cat.x, y = cat.y, H = catH(cat.desk ? cat.desk.stand[1] : cat.perch ? cat.perch.go[1] : cat.y);
+  let x = cat.x, y = cat.y, H = catH(cat.desk ? occ(cat.desk.chair).base : cat.perch ? cat.perch.perch[1] : cat.y);
   if (cat.desk) { x = cat.desk.seat[0]; y = cat.desk.seat[1]; H *= .8; }
-  else if (cat.perch) H *= .85;
+  
   const k = H / 290 * S.k, w = im.width * k, h = im.height * k;
   let lift = 0, rot = 0, sx = 1, sy = 1;
   if (cat.mode === "walk" && !reduceMotion) { lift = Math.abs(Math.sin(cat.phase * .075)) * 7; rot = Math.sin(cat.phase * .075) * .06; }
