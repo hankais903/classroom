@@ -11,7 +11,8 @@ for f in sorted(A.glob("*.webp")):
     assets[f.stem] = "data:image/webp;base64," + base64.b64encode(f.read_bytes()).decode()
 occ = json.loads((A / "occ.json").read_text())
 html = (ROOT / "src" / "index.html").read_text(encoding="utf-8")
-html = html.replace("/*ASSETS*/{}", json.dumps(assets)).replace("/*OCC*/[]", json.dumps(occ))
+foot = json.loads((A / "foot.json").read_text())
+html = html.replace("/*ASSETS*/{}", json.dumps(assets)).replace("/*OCC*/[]", json.dumps(occ)).replace("/*FOOT*/{}", json.dumps(foot))
 out = ROOT / "dist" / "study-office.html"
 out.parent.mkdir(exist_ok=True)
 out.write_text(html, encoding="utf-8")

@@ -109,6 +109,8 @@ h3.sub { margin: 4px 0 0; font-weight: 400; font-size: 1.05rem; }
 <script>
 const ASSETS = /*ASSETS*/{};
 const OCC = /*OCC*/[];
+// floor footprint of each desk and chair: front-left, front-right, back-right, back-left leg tips
+const FOOT = /*FOOT*/{};
 const $id = id => document.getElementById(id);
 const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -215,8 +217,7 @@ const DESKS = [
 // floor footprints the cat cannot walk through
 const BLOCK = [
   [0, 0, 140, 941], [140, 790, 210, 941], [60, 380, 200, 570], [190, 420, 492, 572], [138, 556, 322, 662], [348, 528, 527, 610], [533, 553, 647, 630], [505, 455, 637, 557],
-  [893, 430, 962, 520], [962, 430, 1088, 526], [1066, 400, 1166, 530], [1148, 400, 1425, 574], [1413, 370, 1670, 594], [1585, 845, 1670, 941],
-  [325, 765, 595, 850], [705, 625, 950, 702], [728, 830, 1025, 941], [1015, 690, 1278, 780], [1323, 790, 1605, 880]
+  [893, 430, 962, 520], [962, 430, 1088, 526], [1066, 400, 1166, 530], [1148, 400, 1425, 574], [1413, 370, 1670, 594], [1585, 845, 1670, 941]
 ];
 const PLANT_BLOCK = [955, 530, 1015, 572];
 // things to click besides desks: rect, walk-to point, what happens
@@ -249,6 +250,7 @@ function rebuildGrid() {
     const x = (i + .5) * CELL, y = (j + .5) * CELL;
     let b = y < 462 || y > 932 || x > 1655;
     if (!b) for (const r of blocks) if (x > r[0] - 16 && x < r[2] + 16 && y > r[1] - 6 && y < r[3] + 6) { b = true; break; }
+    if (!b) for (const q of Object.values(FOOT)) if (nearPoly([x, y], q, 14)) { b = true; break; }
     GRID[j * NX + i] = b ? 1 : 0;
   }
 }
@@ -469,20 +471,15 @@ function frame(now) {
   if (owns("neonStudy")) drawNeon(704, 196, t);
   if (marker) { const k = 1 + Math.sin(t * 6) * .12; ctx.save(); ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(marker.x, marker.y, 14 * k, 8 * k, 0, 0, 7); ctx.fillStyle = "rgba(255,211,110,.45)"; ctx.fill(); ctx.stroke(); ctx.restore(); }
 
-  const list = [];
-  OCC.forEach(o => list.push({ key: o.base, draw: () => ctx.drawImage(IMG["occ_" + o.n], o.x, o.y) }));
-  if (owns("bigPlant")) list.push({ key: 566, draw: () => drawPlant(985, 566) });
-  if (owns("catPillow")) list.push({ key: 612, draw: () => { const im = IMG.cat_happy, h = 46, w = h * im.width / im.height; ctx.save(); ctx.translate(250, 600); ctx.rotate(-.12); ctx.drawImage(im, -w / 2, -h, w, h); ctx.restore(); } });
-  const key = cat.desk ? occ(cat.desk.chair).base - .5 : cat.y;
-  list.push({ key, draw: () => drawCat(now, t) });
-  list.sort((a, b) => a.key - b.key).forEach(d => d.draw());
+  // scenery in its fixed back-to-front order; the cat goes in just before the first overlapping thing that is in front of her
+  const list = OCC.map(o => ({ n: o.n, base: o.base, box: [o.x, o.y, o.x + IMG["occ_" + o.n].width, o.y + IMG["occ_" + o.n].height], draw: () => drawPiece(o) }));
+  if (owns("bigPlant")) list.push({ n: "bigPlant", base: 566, box: [940, 420, 1030, 566], draw: () => drawPlant(985, 566) });
+  if (owns("catPillow")) list.push({ n: "catPillow", base: 612, box: [215, 545, 285, 605], draw: () => { const im = IMG.cat_happy, h = 46, w = h * im.width / im.height; ctx.save(); ctx.translate(250, 600); ctx.rotate(-.12); ctx.drawImage(im, -w / 2, -h, w, h); ctx.restore(); } });
+  list.sort((a, b) => a.base - b.base);
+  const cb = catBox(now), at = list.findIndex(o => o.box[0] < cb[2] && o.box[2] > cb[0] && o.box[1] < cb[3] && o.box[3] > cb[1] && inFrontOfCat(o, cb));
+  const cut = at < 0 ? list.length : at;
+  list.slice(0, cut).forEach(o => o.draw()); drawCat(now, t); list.slice(cut).forEach(o => o.draw());
 
-  if (hover && hover.desk && !sheetOpen) {
-    ctx.save(); ctx.shadowColor = "rgba(255,240,170,1)"; ctx.shadowBlur = 18; ctx.globalAlpha = .9;
-    [hover.desk.desk, hover.desk.chair].forEach(n => { const o = occ(n); ctx.drawImage(IMG["occ_" + n], o.x, o.y); });
-    ctx.restore();
-    if (cat.desk) drawCat(now, t);
-  }
   if (owns("pet")) drawParrot(pet.x, pet.y, catH(cat.y) / 195 * 1.3, t, cat.flip);
   if (owns("stars")) {
     ctx.save(); ctx.fillStyle = "#ffe48a"; ctx.shadowColor = "rgba(255,220,120,.9)"; ctx.shadowBlur = 8;
@@ -493,6 +490,39 @@ function frame(now) {
   DESKS.forEach(d => { if (tags[d.s]) placeTag(tags[d.s], d.tag[0], d.tag[1], cat.mode === "stand" && Math.hypot(cat.x - d.stand[0], cat.y - d.stand[1]) < 60 && !cat.desk); });
   if (tags.shop) placeTag(tags.shop, 1290, 470, cat.y < 680 && cat.x > 1150);
   if (tags.board) placeTag(tags.board, 1016, 236, false);
+}
+// is this piece of scenery nearer to the viewer than the cat? Compare her feet with its floor footprint along each screen column
+function colRange(q, x) { let lo = Infinity, hi = -Infinity; for (let i = 0; i < q.length; i++) { const a = q[i], b = q[(i + 1) % q.length]; if ((a[0] - x) * (b[0] - x) > 0 || a[0] === b[0]) continue; const y = a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]); lo = Math.min(lo, y); hi = Math.max(hi, y); } return lo <= hi ? [lo, hi] : null; }
+function inFrontOfCat(o, cb) {
+  if (cat.desk) { if (o.n === cat.desk.chair) return true; if (o.n === cat.desk.desk) return false; }
+  const fx = cb[4], fy = cb[5], q = FOOT[o.n];
+  if (!q) return fy < o.base;
+  const hw = (cb[2] - cb[0]) * .3; let front = false, behind = false;
+  for (const x of [fx - hw, fx, fx + hw]) { const r = colRange(q, x); if (!r) continue; if (fy < (r[0] + r[1]) / 2) front = true; else behind = true; }
+  if (front) return true; if (behind) return false;
+  const v = q.reduce((m, p) => Math.abs(p[0] - fx) < Math.abs(m[0] - fx) ? p : m);
+  return fy < v[1];
+}
+function nearPoly(p, q, d) {
+  let inside = false; for (let i = 0, j = q.length - 1; i < q.length; j = i++) { const a = q[i], b = q[j]; if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside; }
+  if (inside) return true;
+  for (let i = 0; i < q.length; i++) { const a = q[i], b = q[(i + 1) % q.length], vx = b[0] - a[0], vy = b[1] - a[1], t = Math.max(0, Math.min(1, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / (vx * vx + vy * vy))); if (Math.hypot(p[0] - a[0] - vx * t, p[1] - a[1] - vy * t) < d) return true; }
+  return false;
+}
+// the cat's on-screen box plus the point her feet stand on: [x0, y0, x1, y1, footX, footY]
+// a desk or chair cut-out; the one under the mouse glows, drawn in its own place in the order
+function drawPiece(o) {
+  const lit = hover && hover.desk && !sheetOpen && (hover.desk.desk === o.n || hover.desk.chair === o.n);
+  if (lit) { ctx.save(); ctx.shadowColor = "rgba(255,240,170,1)"; ctx.shadowBlur = 18; }
+  ctx.drawImage(IMG["occ_" + o.n], o.x, o.y);
+  if (lit) ctx.restore();
+}
+function catBox(now) {
+  const name = catSprite(now), S = SPR[name], im = IMG["cat_" + name];
+  let x = cat.x, y = cat.y, H = catH(cat.desk ? occ(cat.desk.chair).base : cat.perch ? cat.perch.perch[1] : cat.y);
+  if (cat.desk) { x = cat.desk.seat[0]; y = cat.desk.seat[1]; H *= .8; }
+  const k = H / 290 * S.k, w = im.width * k, h = im.height * k;
+  return [x - S.ax * w, y - h - 40, x + (1 - S.ax) * w, y, x, y];
 }
 function drawCat(now, t) {
   const name = catSprite(now), S = SPR[name], im = IMG["cat_" + name];
