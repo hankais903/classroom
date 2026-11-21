@@ -1,0 +1,660 @@
+<title>讀書辦公室</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&display=swap">
+<style>
+/* Layout: the hand-drawn classroom fills the screen; the cat walks on it, desks and chairs are re-drawn on top when she is behind them. Pill HUD on top, tags in the scene, bottom-sheet cards for practice, tasks and the prize shop. One deliberate light, pastel look that matches the artwork. */
+:root {
+  --bg: #f6d9cc; --ink: #4a3328; --ink2: #8a6a5a; --cream: #fffaf3; --cream2: #fbeee2; --line: #ecd3c0;
+  --pink: #ff9fb2; --pink-d: #d9707f; --mint: #9bd9b4; --mint-d: #4f9f74; --butter: #ffd36e; --butter-d: #d39a2e; --sky: #a9d4f5; --sky-d: #5b98c8;
+  --font: "Huninn", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--font); -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid var(--butter-d); outline-offset: 3px; }
+#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: pointer; }
+.hud { position: fixed; z-index: 3; top: max(10px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 8px; align-items: center; pointer-events: none; }
+.pill { background: rgba(255,250,243,.95); border: 2.5px solid var(--ink); border-radius: 999px; padding: 4px 12px; display: flex; gap: 8px; align-items: center; box-shadow: 0 3px 0 rgba(74,51,40,.25); }
+.pill .t { font-variant-numeric: tabular-nums; }
+.pill small { color: var(--ink2); font-size: .72rem; white-space: nowrap; }
+.coin { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff3b8, #ffcf4a 55%, #d9a431); border: 2px solid #a8761a; display: inline-block; flex: none; }
+.pts { margin-left: auto; font-size: 1.05rem; }
+.pts.bump { animation: bump .5s; } @keyframes bump { 40% { transform: scale(1.25); } }
+.icon-btn { pointer-events: auto; width: 38px; height: 38px; border-radius: 50%; border: 2.5px solid var(--ink); background: rgba(255,250,243,.95); display: grid; place-items: center; font-size: 1.05rem; box-shadow: 0 3px 0 rgba(74,51,40,.25); padding: 0; }
+.hint { position: fixed; z-index: 3; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); max-width: calc(100% - 32px); background: rgba(255,250,243,.95); border: 2.5px solid var(--ink); border-radius: 999px; padding: 6px 16px; font-size: .9rem; box-shadow: 0 3px 0 rgba(74,51,40,.25); pointer-events: none; text-align: center; transition: opacity .25s; }
+.labels { position: fixed; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.tag { position: absolute; left: 0; top: 0; background: var(--cream); border: 2.5px solid var(--ink); border-radius: 12px; padding: 1px 9px 2px; font-size: .82rem; white-space: nowrap; box-shadow: 0 2px 0 rgba(74,51,40,.3); display: flex; gap: 5px; align-items: center; pointer-events: auto; line-height: 1.4; }
+.tag i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; border: 1.5px solid var(--ink); }
+.tag .st { font-size: .7rem; color: var(--ink2); }
+.tag.special { background: var(--butter); }
+.tag.near { animation: nudge 1s infinite; } @keyframes nudge { 50% { margin-top: -4px; } }
+.sheet { position: fixed; z-index: 5; left: 50%; bottom: 0; transform: translate(-50%, 105%); width: min(560px, 100%); max-height: 80vh; overflow-y: auto; background: var(--cream); border: 3px solid var(--ink); border-bottom: 0; border-radius: 26px 26px 0 0; padding: 18px max(18px, env(safe-area-inset-right, 0px)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left, 0px)); box-shadow: 0 -10px 40px rgba(74,51,40,.3); transition: transform .35s cubic-bezier(.2,.9,.3,1); }
+.sheet.open { transform: translate(-50%, 0); }
+.sheet h2 { margin: 0; font-weight: 400; font-size: 1.45rem; display: flex; align-items: center; gap: 10px; padding-right: 40px; text-wrap: balance; }
+.sheet h2 .dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--ink); }
+.sheet p { margin: 0; line-height: 1.7; }
+.sheet .x { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 50%; border: 2.5px solid var(--ink); background: #fff; }
+.stack { display: grid; gap: 12px; }
+.headrow { display: flex; gap: 12px; align-items: center; }
+.headrow > div { min-width: 0; display: grid; gap: 6px; }
+.face { width: 76px; height: auto; flex: none; filter: drop-shadow(0 3px 0 rgba(74,51,40,.15)); }
+.face.sm { width: 56px; }
+.face.pop { animation: pop .45s cubic-bezier(.3,1.6,.5,1); } @keyframes pop { from { transform: scale(.4) rotate(-8deg); opacity: 0; } }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--cream2); border: 2px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: .82rem; }
+.chip.due { background: #ffe6ea; border-color: var(--pink); }
+.btn { border: 2.5px solid var(--ink); background: var(--butter); color: var(--ink); border-radius: 999px; padding: 8px 18px; box-shadow: 0 4px 0 var(--ink); }
+.btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.mint { background: var(--mint); } .btn.ghost { background: var(--cream2); } .btn.pink { background: var(--pink); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.q { background: #fff; border: 2px solid var(--line); border-radius: 18px; padding: 14px; line-height: 1.75; font-size: 1.02rem; }
+.q b { color: var(--pink-d); font-weight: 400; }
+.qmeta { font-size: .8rem; color: var(--ink2); display: flex; justify-content: space-between; gap: 8px; padding-right: 44px; min-height: 30px; align-items: center; }
+.opts { display: grid; gap: 8px; }
+.opt { text-align: left; border: 2px solid var(--line); background: #fff; border-radius: 16px; padding: 10px 14px; display: flex; gap: 10px; align-items: center; box-shadow: 0 3px 0 var(--line); }
+.opt .k { width: 26px; height: 26px; border-radius: 50%; background: var(--cream2); display: grid; place-items: center; font-size: .85rem; flex: none; }
+.opt.right { border-color: var(--mint-d); background: #eaf8ef; } .opt.right .k { background: var(--mint); }
+.opt.wrong { border-color: var(--pink-d); background: #ffeef0; } .opt.wrong .k { background: var(--pink); }
+.opt:disabled { cursor: default; }
+.fb { border-radius: 16px; padding: 10px 14px; line-height: 1.7; display: flex; gap: 10px; align-items: flex-start; }
+.fb > div { min-width: 0; }
+.fb.ok { background: #eaf8ef; } .fb.no { background: #ffeef0; }
+.fb h3 { margin: 0 0 4px; font-weight: 400; font-size: 1.05rem; }
+.rv { background: var(--cream2); border-radius: 16px; padding: 10px 12px; display: grid; gap: 3px; font-size: .92rem; line-height: 1.6; }
+.rv b { color: var(--pink-d); font-weight: 400; } .rv .ok-t { color: var(--mint-d); } .rv-why { border-top: 2px dashed var(--line); padding-top: 5px; margin-top: 3px; }
+.big { font-size: 3.2rem; text-align: center; color: var(--butter-d); line-height: 1; font-variant-numeric: tabular-nums; }
+.center { display: grid; justify-items: center; gap: 6px; }
+.shop { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.prize { border: 2px solid var(--line); background: #fff; border-radius: 18px; padding: 12px; display: grid; gap: 6px; justify-items: center; text-align: center; box-shadow: 0 3px 0 var(--line); }
+.prize .em { font-size: 2.1rem; line-height: 1.1; }
+.prize .nm { font-size: .95rem; } .prize .ds { font-size: .78rem; color: var(--ink2); line-height: 1.4; }
+.prize .cost { display: flex; gap: 5px; align-items: center; font-size: .9rem; }
+.prize.owned { background: #f0faf4; border-color: var(--mint); }
+.tasks { display: grid; gap: 8px; }
+.task { display: flex; gap: 10px; align-items: center; background: #fff; border: 2px solid var(--line); border-radius: 16px; padding: 10px 12px; }
+.task .ck { width: 26px; height: 26px; border-radius: 8px; border: 2.5px solid var(--ink); display: grid; place-items: center; flex: none; background: var(--cream2); font-size: .9rem; }
+.task.done .ck { background: var(--mint); }
+.task .tx { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.task .tx small { color: var(--ink2); font-size: .78rem; }
+.task .btn { padding: 5px 12px; font-size: .85rem; box-shadow: 0 3px 0 var(--ink); }
+.dim { color: var(--ink2); font-size: .85rem; }
+h3.sub { margin: 4px 0 0; font-weight: 400; font-size: 1.05rem; }
+.toast { position: fixed; z-index: 6; left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--cream); border-radius: 999px; padding: 8px 16px; font-size: .9rem; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: calc(100% - 32px); text-align: center; }
+.toast.show { opacity: 1; }
+.fly { position: fixed; z-index: 7; pointer-events: none; transition: transform .8s cubic-bezier(.5,-0.3,.6,1), opacity .8s; }
+.loading { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; align-content: center; gap: 14px; background: var(--bg); color: var(--ink); font-size: 1.1rem; }
+.loading[hidden] { display: none; }
+.bar { width: min(260px, 70vw); height: 12px; border-radius: 999px; background: var(--cream); border: 2px solid var(--ink); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--butter); transition: width .2s; }
+@media (prefers-reduced-motion: reduce) { .face.pop, .tag.near, .pts.bump { animation: none; } .sheet { transition: none; } }
+</style>
+
+<canvas id="c" aria-label="讀書教室：點地板讓貓咪走過去，點書桌開始練習"></canvas>
+<div class="labels" id="labels"></div>
+<div class="hud">
+  <div class="pill"><span class="t" id="clock">--:--</span><small id="dayname"></small></div>
+  <div class="pill pts" id="pts"><span class="coin"></span><span id="ptsN">0</span></div>
+  <button class="icon-btn" id="zoomIn" aria-label="放大">＋</button><button class="icon-btn" id="zoomOut" aria-label="縮小">－</button>
+  <button class="icon-btn" id="fs" aria-label="全螢幕">⛶</button><button class="icon-btn" id="snd" aria-label="聲音開關">🔊</button>
+</div>
+<div class="hint" id="hint">點地板讓貓咪走過去，點書桌開始練習</div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="false"><button class="x" id="sheetX" aria-label="關閉">✕</button><div id="sheetBody"></div></div>
+<div class="toast" id="toast" role="status"></div>
+<div class="loading" id="loading"><div id="loadT">布置教室中…</div><div class="bar"><i id="loadBar"></i></div></div>
+
+<script>
+const ASSETS = /*ASSETS*/{};
+const OCC = /*OCC*/[];
+const $id = id => document.getElementById(id);
+const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const strip = h => h.replace(/<sup>(.*?)<\/sup>/g, "^$1").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
+/* ===================== question data (same as before) ===================== */
+const latS = v => v === 0 ? "0°" : `${Math.abs(v)}°${v > 0 ? "N" : "S"}`;
+const lonS = v => v === 0 ? "0°" : `${Math.abs(v)}°${v > 0 ? "E" : "W"}`;
+const shortName = n => n.replace(/（.*）/, "");
+const PLACES = [
+  ["阿姆斯特丹（荷蘭）", 52.4, 4.9], ["臺北", 25.0, 121.5], ["基督城（紐西蘭）", -43.5, 172.6], ["雷克雅維克（冰島）", 64.1, -21.9],
+  ["富國島（越南）", 10.3, 104.0], ["聖彼得堡（俄羅斯）", 59.9, 30.3], ["澳門", 22.2, 113.5], ["馬尼拉（菲律賓）", 14.6, 121.0],
+  ["雪梨（澳洲）", -33.9, 151.2], ["開普敦（南非）", -33.9, 18.4], ["紐約（美國）", 40.7, -74.0], ["里約熱內盧（巴西）", -22.9, -43.2],
+  ["倫敦（英國）", 51.5, -0.1], ["東京（日本）", 35.7, 139.7], ["開羅（埃及）", 30.0, 31.2]
+];
+function dirOf(a, b) {
+  const dLat = b[1] - a[1], dLon = b[2] - a[2];
+  if (Math.abs(dLon) >= 180) return null;
+  const small = v => Math.abs(v) < 1, fuzzy = v => Math.abs(v) >= 1 && Math.abs(v) < 4;
+  if (small(dLat) && small(dLon)) return null;
+  if (fuzzy(dLat) || fuzzy(dLon)) return null;
+  const ns = small(dLat) ? "" : dLat > 0 ? "北" : "南", ew = small(dLon) ? "" : dLon > 0 ? "東" : "西";
+  return ew + ns;
+}
+function latWhy(a, b) {
+  if (Math.abs(b - a) < 1) return "緯度幾乎一樣，所以不往北也不往南";
+  const north = b > a;
+  if (a >= 0 && b >= 0) return `兩地都是北緯，數字從 ${a} 變成 ${b}，${north ? "變大是往北（離赤道更遠）" : "變小是往南（靠近赤道）"}`;
+  if (a <= 0 && b <= 0) return `兩地都是南緯，數字從 ${-a} 變成 ${-b}，${north ? "變小是往北（靠近赤道）" : "變大是往南（離赤道更遠）"}`;
+  return north ? "從南半球到北半球，是往北" : "從北半球到南半球，是往南";
+}
+function lonWhy(a, b) {
+  if (Math.abs(b - a) < 1) return "經度幾乎一樣，所以不往東也不往西";
+  const east = b > a;
+  if (a >= 0 && b >= 0) return `兩地都是東經，數字從 ${a} 變成 ${b}，${east ? "變大是往東" : "變小是往西"}`;
+  if (a <= 0 && b <= 0) return `兩地都是西經，數字從 ${-a} 變成 ${-b}，${east ? "變小是往東" : "變大是往西"}`;
+  return east ? "從西經跨過 0° 到東經，是往東" : "從東經跨過 0° 到西經，是往西";
+}
+const SEASONS = ["春", "夏", "秋", "冬"], OPP = { "春": "秋", "夏": "冬", "秋": "春", "冬": "夏" };
+const twSeason = m => m >= 3 && m <= 5 ? "春" : m <= 8 && m >= 6 ? "夏" : m >= 9 && m <= 11 ? "秋" : "冬";
+const SCITY = [["基督城（紐西蘭）", -43.5], ["雪梨（澳洲）", -33.9], ["開普敦（南非）", -33.9], ["布宜諾斯艾利斯（阿根廷）", -34.6], ["里約熱內盧（巴西）", -22.9]];
+const NCITY = [["東京（日本）", 35.7], ["倫敦（英國）", 51.5], ["紐約（美國）", 40.7], ["首爾（韓國）", 37.6]];
+const PORT_WHO = [
+  ["澎湖天后宮的石碑寫著「沈有容諭退紅毛番」。「紅毛番」指的是？", ["荷蘭人", "葡萄牙人", "西班牙人", "日本人"], "當時把荷蘭人叫做「紅毛」。"],
+  ["澎湖天后宮石碑上提到的沈有容，是哪個政權的將領？", ["明朝", "清朝", "鄭氏", "荷蘭東印度公司"], "沈有容是明朝的將領，曾到澎湖要荷蘭人離開。"],
+  ["17 世紀統治菲律賓的是哪一國？", ["西班牙", "葡萄牙", "荷蘭", "英國"], "西班牙以菲律賓的馬尼拉為據點，後來又佔領北臺灣。"],
+  ["以澳門作為東亞貿易據點的是哪一國？", ["葡萄牙", "西班牙", "荷蘭", "英國"], "葡萄牙在澳門建立據點。"],
+  ["荷蘭牧師甘治士在新港社、熱蘭遮城一帶傳教。想去看看那一帶，要到今天哪座城市？", ["臺南", "基隆", "淡水", "宜蘭"], "熱蘭遮城在大員，就是今天的臺南安平。荷蘭在南臺灣。"],
+  ["西班牙在臺灣的據點在哪裡？", ["基隆、淡水", "臺南、高雄", "澎湖", "宜蘭、花蓮"], "西班牙在北臺灣：雞籠（基隆）和淡水。"],
+  ["明朝、清朝都實施過海禁。下列說法哪個正確？", ["影響東南沿海的正常經濟", "完全解決了沿海治安問題", "對外貿易完全中斷", "目的只是防堵外國勢力"], "海禁讓沿海居民不能正常出海做生意，經濟受影響；走私和海盜問題也沒有完全解決。"],
+  ["鄭氏時期，陳永華向鄭經建議興建「聖廟」並設學校。「聖廟」是？", ["孔廟", "天后宮", "土地公廟", "教堂"], "聖廟祭祀孔子，和推動教育有關，所以是孔廟。"],
+  ["在臺灣實施軍隊屯田、一邊駐守一邊開墾的是？", ["鄭氏政權", "西班牙", "葡萄牙", "荷蘭"], "鄭成功來臺後讓軍隊屯田開墾。"]
+];
+const VIRTUE = ["理性思考判斷", "遵守法律規範", "和平尊重包容", "參與公共事務"];
+const VPOOL = [
+  ["看到網路上很聳動的新聞，先查證來源，再決定要不要轉傳", "買東西前比較成分和價格，不只聽廣告怎麼說", "選舉前比較候選人的政見和資料，不只看誰比較有名", "聽到兩種說法時，先找證據判斷哪個比較可信"],
+  ["騎腳踏車遵守紅綠燈，晚上開車燈", "不下載盜版的遊戲和影片", "依照規定的時間和方式做垃圾分類", "未滿 18 歲不買菸酒，店員也依法拒絕販售"],
+  ["身心障礙者上街宣導，希望大家多一點耐心、理解和公平的對待", "班上的新住民同學介紹家鄉文化，大家願意好好認識", "同學的興趣和大部分人不一樣，大家不嘲笑他", "媒體和網友對多元性別的表演者給予祝福和支持"],
+  ["參加社區巡守隊，幫忙維護社區安全", "到公聽會上對社區的建設計畫表達意見", "在班會上提出改善教室環境的提案", "連署向市政府陳情，要求改善學校附近危險的路口"]
+];
+const shuffleOpts = (opts, ci) => { const order = shuffle(opts.map((_, i) => i)); return { opts: order.map(i => opts[i]), ci: order.indexOf(ci) }; };
+const SOC = {
+  dir() {
+    let a, b, d; do { [a, b] = shuffle(PLACES).slice(0, 2); d = dirOf(a, b); } while (!d);
+    const flipNS = d.replace("北", "?").replace("南", "北").replace("?", "南"), flipEW = d.replace("東", "?").replace("西", "東").replace("?", "西");
+    const pool = [...new Set([d, flipNS, flipEW, ...shuffle(["北", "南", "東", "西", "東北", "東南", "西北", "西南"])])].filter(x => x).slice(0, 4);
+    const { opts, ci } = shuffleOpts(pool, 0);
+    return { kind: "經緯度判方位", text: `${shortName(a[0])} → ${shortName(b[0])} 的方向`, q: `船從 ${a[0]}（<b>${latS(a[1])}</b>，<b>${lonS(a[2])}</b>）出發，開往 ${b[0]}（<b>${latS(b[1])}</b>，<b>${lonS(b[2])}</b>）。船要往哪個方向開？`, opts, ci, why: `① ${latWhy(a[1], b[1])}。<br>② ${lonWhy(a[2], b[2])}。<br>合起來就是「${d}」。` };
+  },
+  port() { const w = pick(PORT_WHO); const { opts, ci } = shuffleOpts(w[1], 0); return { kind: "大航海時代", text: w[0], q: w[0], opts, ci, why: w[2] }; },
+  virtue() { const v = rnd(0, 3), s = pick(VPOOL[v]); const { opts, ci } = shuffleOpts(VIRTUE, v); return { kind: "公民德性", text: `「${s}」是哪種德性`, q: `「${s}。」<br>這最能表現哪一種公民德性？`, opts, ci, why: `重點是${["先想清楚、查證、比較", "依照法律和規定去做", "尊重、包容和自己不一樣的人", "主動參與公共的事情"][v]}，所以是「${VIRTUE[v]}」。` }; },
+  season() { const mo = rnd(1, 12), tw = twSeason(mo), south = Math.random() < .7, city = pick(south ? SCITY : NCITY), ans = south ? OPP[tw] : tw; const { opts, ci } = shuffleOpts(SEASONS.map(x => x + "季"), SEASONS.indexOf(ans)); return { kind: "南北半球季節", text: `${mo} 月 ${shortName(city[0])} 的季節`, q: `${mo} 月時臺灣是${tw}天。這時候 ${city[0]}（<b>${latS(city[1])}</b>）是什麼季節？`, opts, ci, why: `${city[0]}在${city[1] < 0 ? "南" : "北"}半球。${city[1] < 0 ? `和臺灣季節相反：臺灣${tw}天，那裡是${ans}天。` : `和臺灣同在北半球，季節一樣。`}` }; }
+};
+const fmtN = v => v < 0 ? `−${-v}` : `${v}`;
+const MATH = {
+  dist() { let a, b; do { a = rnd(-15, 12); b = rnd(-10, 18); } while (a >= 0 === b >= 0 || a === b || Math.abs(a) === Math.abs(b)); const [lo, hi] = a < b ? [a, b] : [b, a], ans = hi - lo; const pool = [...new Set([ans, Math.abs(a + b), Math.abs(Math.abs(a) - Math.abs(b)), ans + 2, ans - 2].filter(v => v > 0))].slice(0, 4); const { opts, ci } = shuffleOpts(pool.map(String), 0); return { kind: "數線距離", text: `${fmtN(a)} 和 ${fmtN(b)} 的距離`, q: `數線上 A 點在 <b>${fmtN(a)}</b>，B 點在 <b>${fmtN(b)}</b>。A、B 兩點的距離是多少？`, opts, ci, why: `距離 = 大 − 小 = ${fmtN(hi)} − (${fmtN(lo)}) = ${ans}。<br>不能直接把兩個數加起來（|${fmtN(a)} + ${fmtN(b)}| = ${Math.abs(a + b)} 是錯的）。` }; },
+  mid() { let a, b; do { a = rnd(-14, 6); b = rnd(-4, 16); } while ((a + b) % 2 || a === b || a >= b); const m = (a + b) / 2; const pool = [...new Set([m, (b - a) / 2, a + b, m + 1].map(v => v))].slice(0, 4); const { opts, ci } = shuffleOpts(pool.map(fmtN), 0); return { kind: "中點", text: `${fmtN(a)} 和 ${fmtN(b)} 的中點`, q: `數線上 A 點在 <b>${fmtN(a)}</b>，B 點在 <b>${fmtN(b)}</b>。A、B 的中點 M 在哪裡？`, opts, ci, why: `中點 = (A + B) ÷ 2 = (${fmtN(a)} + ${fmtN(b)}) ÷ 2 = ${fmtN(m)}。<br>(B − A) ÷ 2 = ${(b - a) / 2} 是「一半的距離」，不是中點的位置。` }; },
+  pow() { const n = rnd(2, 4), k = rnd(2, 4), paren = Math.random() < .5, val = paren ? Math.pow(-n, k) : -Math.pow(n, k); const pool = [...new Set([val, -val, paren ? -Math.pow(n, k) : Math.pow(-n, k), n * k, -n * k])].filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 4); if (pool.length < 4) pool.push(val + 1); const { opts, ci } = shuffleOpts(pool.map(fmtN), 0); const ex = paren ? `(−${n})<sup>${k}</sup>` : `−${n}<sup>${k}</sup>`; return { kind: "負數次方", text: strip(ex) + " 的值", q: `計算：<b>${ex}</b> = ？`, opts, ci, why: paren ? `有括號，底數是 −${n}：${k} 個 (−${n}) 相乘。${k % 2 ? "奇數個負數相乘是負的" : "偶數個負數相乘是正的"}，答案是 ${fmtN(val)}。` : `沒有括號，次方只管 ${n}：先算 ${n}<sup>${k}</sup> = ${Math.pow(n, k)}，再加負號，答案是 ${fmtN(val)}。` }; },
+  abs() { const d = rnd(2, 12); const pool = [`${d} 或 −${d}`, `只有 ${d}`, `只有 −${d}`, `0`]; const { opts, ci } = shuffleOpts(pool, 0); return { kind: "絕對值", text: `|x| = ${d}`, q: `<b>|x| = ${d}</b>，x 可能是多少？`, opts, ci, why: `|x| 是 x 到 0 的距離。離 0 有 ${d} 那麼遠的點有兩個：${d} 和 −${d}。` }; }
+};
+const ROUND = { 社會: ["dir", "dir", "port", "virtue", "season"], 數學: ["dist", "dist", "mid", "pow", "abs"] };
+
+/* ===================== the classroom picture ===================== */
+const IW = 1670, IH = 941;
+const SUBJ = {
+  國文: { css: "#ff9fb2", weak: ["閱讀理解", "否定題（錯誤、不是）"], ready: false },
+  英文: { css: "#a9d4f5", weak: ["複數", "所有格 our / my", "疑問詞 who / what"], ready: false },
+  數學: { css: "#ffd36e", weak: ["數線上兩點距離", "中點", "負數的次方與底數"], ready: true },
+  社會: { css: "#9bd9b4", weak: ["用經緯度判斷方位", "荷蘭、西班牙、葡萄牙據點", "四種公民德性"], ready: true },
+  自然: { css: "#c7b8f0", weak: ["顯微鏡操作", "細胞構造判讀", "否定題"], ready: false }
+};
+// desk + chair cut-outs, where the cat sits, where she walks to first, where the tag floats
+const DESKS = [
+  { s: "國文", desk: "desk1", chair: "chair1", seat: [420, 740], stand: [410, 874], tag: [470, 574] },
+  { s: "英文", desk: "desk2", chair: "chair2", seat: [781, 616], stand: [772, 724], tag: [848, 462] },
+  { s: "數學", desk: "desk3", chair: "chair3", seat: [834, 813], stand: [702, 906], tag: [882, 641] },
+  { s: "社會", desk: "desk4", chair: "chair4", seat: [1111, 673], stand: [1100, 802], tag: [1152, 514] },
+  { s: "自然", desk: "desk5", chair: "chair5", seat: [1427, 758], stand: [1415, 906], tag: [1476, 590] }
+];
+// floor footprints the cat cannot walk through
+const BLOCK = [
+  [0, 0, 140, 941], [140, 790, 210, 941], [60, 380, 200, 570], [190, 420, 492, 572], [138, 556, 322, 662], [348, 528, 527, 610], [533, 553, 647, 630], [505, 455, 637, 557],
+  [893, 430, 962, 520], [962, 430, 1088, 526], [1066, 400, 1166, 530], [1148, 400, 1425, 574], [1413, 370, 1670, 594], [1585, 845, 1670, 941],
+  [325, 765, 595, 850], [705, 625, 950, 702], [728, 830, 1025, 941], [1015, 690, 1278, 780], [1323, 790, 1605, 880]
+];
+const PLANT_BLOCK = [955, 530, 1015, 572];
+// things to click besides desks: rect, walk-to point, what happens
+const SPOTS = [
+  { id: "gumball", r: [1068, 330, 1168, 530], go: [1116, 560], face: "back", say: "扭蛋機：轉一下，喀啦喀啦～（還不能用點數扭喔）" },
+  { id: "board", r: [960, 232, 1072, 392], go: [1012, 562], face: "back", open: () => openTasks() },
+  { id: "shop", r: [1095, 90, 1665, 594], go: [1290, 612], face: "back", open: () => openShop() },
+  { id: "vending", r: [575, 288, 688, 452], go: [630, 482], face: "back", say: "自動販賣機：讀完一輪再來喝飲料吧！" },
+  { id: "books", r: [745, 245, 918, 462], go: [830, 486], face: "back", say: "書櫃：課本和參考書都放在這裡。" },
+  { id: "beanPink", r: [140, 532, 322, 662], go: [232, 690], perch: [232, 610], pose: "sit", say: "粉紅懶骨頭好軟～" },
+  { id: "beanBlue", r: [507, 457, 637, 557], go: [690, 540], perch: [574, 528], pose: "sit", say: "藍色懶骨頭，坐起來好舒服。" },
+  { id: "pouf", r: [535, 555, 647, 630], go: [592, 664], perch: [592, 600], pose: "sit", say: "坐在小圓凳上休息一下。" },
+  { id: "sofa", r: [190, 430, 492, 572], go: [330, 690], perch: [338, 532], pose: "lie", say: "躺在沙發上睡個午覺… 休息也很重要！" }
+];
+const START = [600, 790];
+
+/* ===================== images ===================== */
+const IMG = {};
+function loadImg(k, src) { return new Promise((res, rej) => { const im = new Image(); im.onload = () => { IMG[k] = im; res(); }; im.onerror = () => rej(new Error(k)); im.src = src; }); }
+async function loadAll(onP) { const keys = Object.keys(ASSETS); let n = 0; await Promise.all(keys.map(k => loadImg(k, ASSETS[k]).then(() => onP(++n / keys.length)))); }
+const occ = n => OCC.find(o => o.n === n);
+
+/* ===================== walking grid + A* ===================== */
+const CELL = 8, NX = Math.ceil(IW / CELL), NY = Math.ceil(IH / CELL);
+let GRID = new Uint8Array(NX * NY);
+function rebuildGrid() {
+  GRID.fill(0);
+  const blocks = BLOCK.concat(owns("bigPlant") ? [PLANT_BLOCK] : []);
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+    const x = (i + .5) * CELL, y = (j + .5) * CELL;
+    let b = y < 462 || y > 932 || x > 1655;
+    if (!b) for (const r of blocks) if (x > r[0] - 16 && x < r[2] + 16 && y > r[1] - 6 && y < r[3] + 6) { b = true; break; }
+    GRID[j * NX + i] = b ? 1 : 0;
+  }
+}
+const free = (i, j) => i >= 0 && j >= 0 && i < NX && j < NY && !GRID[j * NX + i];
+const cellOf = (x, y) => [Math.floor(x / CELL), Math.floor(y / CELL)];
+const cellC = (i, j) => [(i + .5) * CELL, (j + .5) * CELL];
+function nearestFree(i, j) { if (free(i, j)) return [i, j]; for (let r = 1; r < 40; r++) { let best = null, bd = 1e9; for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) { if (Math.max(Math.abs(di), Math.abs(dj)) !== r || !free(i + di, j + dj)) continue; const d = di * di + dj * dj; if (d < bd) { bd = d; best = [i + di, j + dj]; } } if (best) return best; } return null; }
+function astar(sx, sy, tx, ty) {
+  const s = nearestFree(...cellOf(sx, sy)), t = nearestFree(...cellOf(tx, ty)); if (!s || !t) return null;
+  const N = NX * NY, g = new Float32Array(N).fill(1e9), from = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
+  const heap = [], push = (f, k) => { heap.push([f, k]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
+  const si = s[1] * NX + s[0], ti = t[1] * NX + t[0], hh = k => Math.hypot(k % NX - t[0], Math.floor(k / NX) - t[1]);
+  g[si] = 0; push(hh(si), si);
+  while (heap.length) {
+    const [, k] = pop(); if (closed[k]) continue; closed[k] = 1; if (k === ti) break;
+    const ci = k % NX, cj = Math.floor(k / NX);
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      if (!di && !dj) continue; const ni = ci + di, nj = cj + dj; if (!free(ni, nj)) continue;
+      if (di && dj && (!free(ci + di, cj) || !free(ci, cj + dj))) continue;
+      const nk = nj * NX + ni, ng = g[k] + (di && dj ? 1.414 : 1);
+      if (ng < g[nk]) { g[nk] = ng; from[nk] = k; push(ng + hh(nk), nk); }
+    }
+  }
+  if (from[ti] < 0 && si !== ti) return null;
+  const path = []; for (let k = ti; k >= 0; k = from[k]) { path.push(cellC(k % NX, Math.floor(k / NX))); if (k === si) break; }
+  return path.reverse();
+}
+function lineFree(p, q) { const n = Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / (CELL * .4)); for (let k = 0; k <= n; k++) { const x = p[0] + (q[0] - p[0]) * k / n, y = p[1] + (q[1] - p[1]) * k / n; if (!free(...cellOf(x, y))) return false; } return true; }
+function smooth(path) { if (!path || path.length < 3) return path; const out = [path[0]]; let a = 0; while (a < path.length - 1) { let b = path.length - 1; while (b > a + 1 && !lineFree(path[a], path[b])) b--; out.push(path[b]); a = b; } return out; }
+
+/* ===================== the cat ===================== */
+// per-sprite: horizontal anchor (body centre), scale vs. the front view, hat position (fraction of width/height) and head width in source px
+const SPR = {
+  front: { ax: .43, k: 1, hat: [.44, .07], hw: 225 },
+  side: { ax: .47, k: 1, hat: [.52, .07], hw: 215 },
+  back: { ax: .43, k: 1, hat: [.45, .07], hw: 235 },
+  sit: { ax: .45, k: 1.12, hat: [.46, .08], hw: 200 },
+  lie: { ax: .45, k: 1.15, hat: [.33, .1], hw: 185 },
+  jump: { ax: .45, k: 1.25, hat: [.42, .1], hw: 180 }
+};
+const cat = { x: START[0], y: START[1], path: [], onArrive: null, mode: "stand", face: "front", flip: false, phase: 0, idle: 0, desk: null, perch: null, hop: null, cheer: 0 };
+let marker = null;
+const catH = y => 80 + (y - 455) * .095;
+function walkTo(x, y, cb) {
+  leaveSeat();
+  const p = smooth(astar(cat.x, cat.y, x, y));
+  if (!p) { toast("那裡走不過去喔"); return; }
+  const [ex, ey] = cellC(...nearestFree(...cellOf(x, y)));
+  p.shift(); if (p.length) p[p.length - 1] = [ex, ey]; else p.push([ex, ey]);
+  cat.path = p; cat.onArrive = cb || null; cat.mode = "walk"; cat.idle = 0; marker = { x: ex, y: ey };
+}
+function hopTo(x, y, cb) { cat.hop = { x0: cat.x, y0: cat.y, x1: x, y1: y, t: 0, cb }; cat.mode = "hop"; }
+function leaveSeat() {
+  if (cat.desk) { const d = cat.desk; cat.desk = null; cat.x = d.stand[0]; cat.y = d.stand[1]; }
+  if (cat.perch) { const s = cat.perch; cat.perch = null; cat.x = s.go[0]; cat.y = s.go[1]; }
+  cat.hop = null; cat.mode = "stand"; cat.face = "front";
+}
+
+/* ===================== view: cover the screen, follow the cat, drag / zoom ===================== */
+const cv = $id("c"), ctx = cv.getContext("2d");
+let dpr = 1, minScale = 1, zoomK = 1, scale = 1, vcx = IW / 2, vcy = IH / 2, userPanned = -1e9;
+function resize() { dpr = Math.min(devicePixelRatio || 1, 2); cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr); minScale = Math.max(cv.width / IW, cv.height / IH); scale = minScale * zoomK; clampView(); }
+function clampView() { const hw = cv.width / scale / 2, hh = cv.height / scale / 2; vcx = Math.min(IW - hw, Math.max(hw, vcx)); vcy = Math.min(IH - hh, Math.max(hh, vcy)); }
+const toScreen = (x, y) => [(x - vcx) * scale + cv.width / 2, (y - vcy) * scale + cv.height / 2];
+const fromClient = (x, y) => [(x * dpr - cv.width / 2) / scale + vcx, (y * dpr - cv.height / 2) / scale + vcy];
+function setZoom(k, ax, ay) {
+  const before = ax != null ? fromClient(ax, ay) : null; zoomK = Math.min(3, Math.max(1, k)); scale = minScale * zoomK;
+  if (before) { const after = fromClient(ax, ay); vcx += before[0] - after[0]; vcy += before[1] - after[1]; }
+  clampView(); userPanned = performance.now();
+}
+$id("zoomIn").onclick = () => setZoom(zoomK * 1.35); $id("zoomOut").onclick = () => setZoom(zoomK / 1.35);
+addEventListener("resize", resize);
+
+/* ===================== picking ===================== */
+const inR = (p, r) => p[0] >= r[0] && p[0] <= r[2] && p[1] >= r[1] && p[1] <= r[3];
+function deskBox(d) { const a = occ(d.desk), b = occ(d.chair), A = IMG["occ_" + d.desk], B = IMG["occ_" + d.chair]; return [Math.min(a.x, b.x), Math.min(a.y, b.y), Math.max(a.x + A.width, b.x + B.width), Math.max(a.y + A.height, b.y + B.height)]; }
+function hitAt(p) {
+  // desks first, nearest to the viewer first (they overlap the ones behind)
+  for (const d of DESKS.slice().sort((a, b) => occ(b.chair).base - occ(a.chair).base)) if (inR(p, deskBox(d)) && solidAt(d, p)) return { desk: d };
+  for (const s of SPOTS) if (inR(p, s.r)) return { spot: s };
+  return null;
+}
+// only count a click on the desk/chair itself, not the floor showing between the legs
+const solidCache = {};
+function solidAt(d, p) {
+  for (const n of [d.desk, d.chair]) {
+    const o = occ(n), im = IMG["occ_" + n]; if (!inR(p, [o.x, o.y, o.x + im.width - 1, o.y + im.height - 1])) continue;
+    if (!solidCache[n]) { const c = document.createElement("canvas"); c.width = im.width; c.height = im.height; const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(im, 0, 0); solidCache[n] = { w: im.width, a: g.getImageData(0, 0, im.width, im.height).data }; }
+    const S = solidCache[n], x = Math.floor(p[0] - o.x), y = Math.floor(p[1] - o.y);
+    for (let dy = -6; dy <= 6; dy += 3) for (let dx = -6; dx <= 6; dx += 3) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= S.w) continue; if (S.a[((yy * S.w) + xx) * 4 + 3] > 100) return true; }
+  }
+  return false;
+}
+let hover = null;
+function activate(h) {
+  if (h.desk) return goDesk(h.desk);
+  const s = h.spot;
+  walkTo(s.go[0], s.go[1], () => {
+    if (s.perch) { hopTo(s.perch[0], s.perch[1], () => { cat.perch = s; cat.mode = "perch"; }); if (s.say) toast(s.say); return; }
+    cat.face = s.face || "front"; cat.mode = "stand";
+    if (s.open) { sfx("tick"); s.open(); } else if (s.say) { toast(s.say); sfx("tick"); }
+  });
+  hint(s.id === "shop" ? "走去集點換獎…" : s.id === "board" ? "去看今天的任務…" : "點書桌開始練習");
+}
+function tap(cx, cy) {
+  if (sheetOpen) return;
+  const p = fromClient(cx, cy), h = hitAt(p);
+  if (h) return activate(h);
+  walkTo(p[0], p[1]); hint("點書桌開始練習");
+}
+const ptrs = new Map(); let drag = null, pinch = null;
+cv.addEventListener("pointerdown", e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); if (ptrs.size === 1) drag = { x: e.clientX, y: e.clientY, moved: false }; if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), k: zoomK }; drag = null; } });
+cv.addEventListener("pointermove", e => {
+  if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pinch && ptrs.size === 2) { const [a, b] = [...ptrs.values()]; setZoom(pinch.k * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); return; }
+  if (drag && ptrs.size === 1) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (drag.moved || Math.hypot(dx, dy) > 7) { drag.moved = true; vcx -= dx * dpr / scale; vcy -= dy * dpr / scale; drag.x = e.clientX; drag.y = e.clientY; clampView(); userPanned = performance.now(); } return; }
+  if (e.pointerType === "mouse") hover = sheetOpen ? null : hitAt(fromClient(e.clientX, e.clientY));
+});
+const endPtr = e => { const d = drag; ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; if (d && !d.moved && ptrs.size === 0 && e.type === "pointerup") tap(e.clientX, e.clientY); if (ptrs.size === 0) drag = null; };
+cv.addEventListener("pointerup", endPtr); cv.addEventListener("pointercancel", endPtr);
+cv.addEventListener("pointerleave", () => { hover = null; });
+cv.addEventListener("wheel", e => { e.preventDefault(); setZoom(zoomK * Math.exp(-e.deltaY * .0015), e.clientX, e.clientY); }, { passive: false });
+
+/* ===================== tags in the scene ===================== */
+const labelsEl = $id("labels"), tags = {};
+function makeTag(id, html, cls, onclick) { const el = document.createElement("button"); el.className = `tag ${cls || ""}`; el.innerHTML = html; el.onclick = onclick; labelsEl.append(el); tags[id] = el; return el; }
+function refreshTags() {
+  DESKS.forEach(d => { const s = SUBJ[d.s], st = progress.stats[d.s] || { right: 0, total: 0 }; const html = `<i style="background:${s.css}"></i>${d.s}<span class="st">${s.ready ? (st.total ? `${st.right}/${st.total}` : "可練習") : "準備中"}</span>`; if (!tags[d.s]) makeTag(d.s, html, "", () => { if (!sheetOpen) goDesk(d); }); else tags[d.s].innerHTML = html; });
+  if (!tags.shop) makeTag("shop", `<span class="coin" style="width:13px;height:13px"></span>兌換獎品`, "special", () => { if (!sheetOpen) activate({ spot: SPOTS.find(s => s.id === "shop") }); });
+  const left = TASKS.filter(t => !daily().claimed.includes(t.id)).length;
+  const html = `今日任務<span class="st">${left ? `還有 ${left} 個` : "完成！"}</span>`;
+  if (!tags.board) makeTag("board", html, "", () => { if (!sheetOpen) activate({ spot: SPOTS.find(s => s.id === "board") }); }); else tags.board.innerHTML = html;
+}
+function placeTag(el, x, y, near) { const [sx, sy] = toScreen(x, y); el.style.transform = `translate(${(sx / dpr).toFixed(1)}px, ${(sy / dpr).toFixed(1)}px) translate(-50%, -100%)`; el.classList.toggle("near", !!near); }
+
+/* ===================== drawing helpers ===================== */
+const INK = "#4a3328";
+function drawHat(x, y, w) { // captain hat, bottom-centre at (x, y)
+  ctx.save(); ctx.translate(x, y); ctx.lineWidth = w * .055; ctx.strokeStyle = INK; ctx.lineJoin = "round";
+  ctx.beginPath(); ctx.moveTo(-w * .42, -w * .1); ctx.bezierCurveTo(-w * .5, -w * .55, w * .5, -w * .55, w * .42, -w * .1); ctx.closePath(); ctx.fillStyle = "#ffffff"; ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.rect(-w * .43, -w * .17, w * .86, w * .14); ctx.fillStyle = "#3d4f86"; ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0, -w * .02, w * .36, w * .08, 0, 0, Math.PI); ctx.fillStyle = "#2d2a33"; ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, -w * .3, w * .07, 0, 7); ctx.fillStyle = "#ffcf4a"; ctx.fill(); ctx.lineWidth = w * .035; ctx.stroke();
+  ctx.restore();
+}
+function drawParrot(x, y, s, t, flip) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(flip ? -s : s, s); ctx.lineWidth = 2.6; ctx.strokeStyle = INK; ctx.lineJoin = "round";
+  const flap = Math.sin(t * 14) * .5;
+  ctx.beginPath(); ctx.moveTo(6, 8); ctx.lineTo(18, 22); ctx.lineTo(10, 24); ctx.closePath(); ctx.fillStyle = "#5fb6e8"; ctx.fill(); ctx.stroke(); // tail
+  ctx.beginPath(); ctx.ellipse(0, 0, 14, 15, 0, 0, 7); ctx.fillStyle = "#86d27e"; ctx.fill(); ctx.stroke(); // body
+  ctx.beginPath(); ctx.ellipse(-2, 5, 8, 8, 0, 0, 7); ctx.fillStyle = "#fff0a8"; ctx.fill();
+  ctx.save(); ctx.translate(6, 0); ctx.rotate(-.4 + flap); ctx.beginPath(); ctx.ellipse(6, 0, 10, 6, 0, 0, 7); ctx.fillStyle = "#6cbf66"; ctx.fill(); ctx.stroke(); ctx.restore(); // wing
+  ctx.beginPath(); ctx.moveTo(-13, -3); ctx.quadraticCurveTo(-21, 0, -14, 6); ctx.closePath(); ctx.fillStyle = "#ffb04a"; ctx.fill(); ctx.stroke(); // beak
+  ctx.beginPath(); ctx.arc(-6, -5, 2.4, 0, 7); ctx.fillStyle = INK; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-4, 1, 3, 2, 0, 0, 7); ctx.fillStyle = "rgba(255,130,150,.7)"; ctx.fill();
+  ctx.restore();
+}
+function drawPlant(x, y) { // big leafy plant, pot bottom-centre at (x, y)
+  ctx.save(); ctx.translate(x, y); ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.lineJoin = "round";
+  const leaf = (ang, len, wd, col) => { ctx.save(); ctx.translate(0, -44); ctx.rotate(ang); ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(wd, -len * .3, wd * .8, -len * .8, 0, -len); ctx.bezierCurveTo(-wd * .8, -len * .8, -wd, -len * .3, 0, 0); ctx.fillStyle = col; ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, -4); ctx.lineTo(0, -len * .85); ctx.lineWidth = 2; ctx.strokeStyle = "rgba(60,110,60,.55)"; ctx.stroke(); ctx.restore(); };
+  [[-1.1, 70, 20, "#6fbf69"], [1.05, 72, 20, "#6fbf69"], [-.6, 92, 24, "#80cd77"], [.55, 90, 24, "#80cd77"], [-.15, 104, 26, "#8fd685"], [.2, 98, 24, "#77c76f"]].forEach(l => leaf(...l));
+  ctx.beginPath(); ctx.moveTo(-30, -48); ctx.lineTo(30, -48); ctx.lineTo(24, -4); ctx.quadraticCurveTo(0, 4, -24, -4); ctx.closePath(); ctx.fillStyle = "#fff6ea"; ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-8, -28, 2.2, 0, 7); ctx.arc(8, -28, 2.2, 0, 7); ctx.fillStyle = INK; ctx.fill();
+  ctx.beginPath(); ctx.arc(0, -24, 3.5, .2, Math.PI - .2); ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = "rgba(255,140,160,.55)"; ctx.beginPath(); ctx.ellipse(-15, -22, 4, 2.5, 0, 0, 7); ctx.ellipse(15, -22, 4, 2.5, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawNeon(x, y, t) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(.74, .74); const fl = reduceMotion ? 1 : .85 + .15 * Math.sin(t * 3.1) * Math.sin(t * 7.3);
+  ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.fillStyle = "rgba(74,51,40,.85)";
+  ctx.beginPath(); ctx.roundRect(-62, -24, 124, 48, 14); ctx.fill(); ctx.stroke();
+  ctx.font = "30px Huninn, 'PingFang TC', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.shadowColor = `rgba(255,120,170,${fl})`; ctx.shadowBlur = 16; ctx.fillStyle = "#ffd1e2"; ctx.fillText("讀書中", 0, 2); ctx.shadowBlur = 6; ctx.fillText("讀書中", 0, 2);
+  ctx.restore();
+}
+function drawStar4(x, y, r, a) { ctx.globalAlpha = a; ctx.beginPath(); for (let k = 0; k < 8; k++) { const rr = k % 2 ? r * .36 : r, an = k * Math.PI / 4 - Math.PI / 2; ctx.lineTo(x + Math.cos(an) * rr, y + Math.sin(an) * rr); } ctx.closePath(); ctx.fill(); }
+
+/* ===================== frame loop ===================== */
+let last = performance.now();
+const pet = { x: START[0] - 50, y: START[1] - 110 };
+const stars = Array.from({ length: 26 }, () => ({ x: Math.random() * IW, y: Math.random() * IH * .8, s: .6 + Math.random() * .9, p: Math.random() * 6, v: .3 + Math.random() * .5 }));
+function catSprite(now) {
+  if (cat.cheer > now) return "jump";
+  if (cat.desk) return "back";
+  if (cat.perch) return cat.perch.pose;
+  if (cat.mode === "walk" || cat.mode === "hop") return cat.face;
+  if (cat.idle > 7) return "sit";
+  return cat.face;
+}
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
+  // movement
+  if (cat.mode === "walk" && cat.path.length) {
+    const [tx, ty] = cat.path[0], dx = tx - cat.x, dy = ty - cat.y, d = Math.hypot(dx, dy), step = 190 * dt * (catH(cat.y) / 110);
+    if (d > .01) { if (Math.abs(dx) > Math.abs(dy) * .8) { cat.face = "side"; cat.flip = dx > 0; } else cat.face = dy > 0 ? "front" : "back"; }
+    if (d <= step) { cat.x = tx; cat.y = ty; cat.phase += d; cat.path.shift(); if (!cat.path.length) { marker = null; cat.mode = "stand"; cat.face = "front"; const cb = cat.onArrive; cat.onArrive = null; if (cb) cb(); } }
+    else { cat.x += dx / d * step; cat.y += dy / d * step; cat.phase += step; }
+  } else if (cat.mode === "hop" && cat.hop) {
+    const h = cat.hop; h.t = Math.min(1, h.t + dt / .4); cat.x = h.x0 + (h.x1 - h.x0) * h.t; cat.y = h.y0 + (h.y1 - h.y0) * h.t;
+    if (Math.abs(h.x1 - h.x0) > Math.abs(h.y1 - h.y0) * .8) { cat.face = "side"; cat.flip = h.x1 > h.x0; } else cat.face = h.y1 > h.y0 ? "front" : "back";
+    if (h.t >= 1) { cat.hop = null; cat.mode = "stand"; if (h.cb) h.cb(); }
+  } else if (cat.mode === "stand") cat.idle += dt;
+  // parrot
+  if (owns("pet")) {
+    const side = cat.flip ? -1 : 1, H = catH(cat.y), bx = cat.desk ? cat.desk.seat[0] : cat.x, by = cat.desk ? cat.desk.seat[1] : cat.y, gx = bx - side * H * .6, gy = by - H * 1.05 + Math.sin(t * 2.2) * 6;
+    pet.x += (gx - pet.x) * Math.min(1, dt * 3); pet.y += (gy - pet.y) * Math.min(1, dt * 3);
+  }
+  // camera follows the cat unless the player just dragged
+  if (now - userPanned > 2500) { const k = Math.min(1, dt * 2.2); vcx += (cat.x - vcx) * k; vcy += (cat.y - 60 - vcy) * k; clampView(); }
+
+  // ---- draw ----
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = "#f6d9cc"; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(scale, 0, 0, scale, cv.width / 2 - vcx * scale, cv.height / 2 - vcy * scale);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(IMG.bg, 0, 0);
+  if (owns("neonStudy")) drawNeon(704, 196, t);
+  if (marker) { const k = 1 + Math.sin(t * 6) * .12; ctx.save(); ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(marker.x, marker.y, 14 * k, 8 * k, 0, 0, 7); ctx.fillStyle = "rgba(255,211,110,.45)"; ctx.fill(); ctx.stroke(); ctx.restore(); }
+
+  const list = [];
+  OCC.forEach(o => list.push({ key: o.base, draw: () => ctx.drawImage(IMG["occ_" + o.n], o.x, o.y) }));
+  if (owns("bigPlant")) list.push({ key: 566, draw: () => drawPlant(985, 566) });
+  if (owns("catPillow")) list.push({ key: 612, draw: () => { const im = IMG.cat_happy, h = 46, w = h * im.width / im.height; ctx.save(); ctx.translate(250, 600); ctx.rotate(-.12); ctx.drawImage(im, -w / 2, -h, w, h); ctx.restore(); } });
+  const key = cat.desk ? occ(cat.desk.chair).base - .5 : cat.y;
+  list.push({ key, draw: () => drawCat(now, t) });
+  list.sort((a, b) => a.key - b.key).forEach(d => d.draw());
+
+  if (hover && hover.desk && !sheetOpen) {
+    ctx.save(); ctx.shadowColor = "rgba(255,240,170,1)"; ctx.shadowBlur = 18; ctx.globalAlpha = .9;
+    [hover.desk.desk, hover.desk.chair].forEach(n => { const o = occ(n); ctx.drawImage(IMG["occ_" + n], o.x, o.y); });
+    ctx.restore();
+    if (cat.desk) drawCat(now, t);
+  }
+  if (owns("pet")) drawParrot(pet.x, pet.y, catH(cat.y) / 110 * 1.2, t, cat.flip);
+  if (owns("stars")) {
+    ctx.save(); ctx.fillStyle = "#ffe48a"; ctx.shadowColor = "rgba(255,220,120,.9)"; ctx.shadowBlur = 8;
+    stars.forEach(s => { if (!reduceMotion) { s.y += dt * 14 * s.v; s.x += Math.sin(t * .8 + s.p) * dt * 8; if (s.y > IH * .9) { s.y = -20; s.x = Math.random() * IW; } } drawStar4(s.x, s.y, 7 * s.s, .4 + .45 * (Math.sin(t * 2.4 + s.p) * .5 + .5)); });
+    ctx.restore();
+  }
+  // tags
+  DESKS.forEach(d => { if (tags[d.s]) placeTag(tags[d.s], d.tag[0], d.tag[1], cat.mode === "stand" && Math.hypot(cat.x - d.stand[0], cat.y - d.stand[1]) < 60 && !cat.desk); });
+  if (tags.shop) placeTag(tags.shop, 1290, 470, cat.y < 680 && cat.x > 1150);
+  if (tags.board) placeTag(tags.board, 1016, 236, false);
+}
+function drawCat(now, t) {
+  const name = catSprite(now), S = SPR[name], im = IMG["cat_" + name];
+  let x = cat.x, y = cat.y, H = catH(cat.desk ? cat.desk.stand[1] : cat.perch ? cat.perch.go[1] : cat.y);
+  if (cat.desk) { x = cat.desk.seat[0]; y = cat.desk.seat[1]; H *= .86; }
+  const k = H / 290 * S.k, w = im.width * k, h = im.height * k;
+  let lift = 0, rot = 0, sx = 1, sy = 1;
+  if (cat.mode === "walk" && !reduceMotion) { lift = Math.abs(Math.sin(cat.phase * .075)) * 7; rot = Math.sin(cat.phase * .075) * .06; }
+  else if (cat.mode === "hop") lift = Math.sin(cat.hop ? cat.hop.t * Math.PI : 0) * 40;
+  else if (name === "jump" && !reduceMotion) lift = Math.abs(Math.sin(t * 7)) * 18;
+  else if (!reduceMotion) { sy = 1 + Math.sin(t * 2.2) * .015; sx = 1 - Math.sin(t * 2.2) * .008; }
+  const flip = name === "side" && cat.flip;
+  if (!cat.desk && !cat.perch) { ctx.save(); ctx.fillStyle = "rgba(120,60,50,.2)"; ctx.beginPath(); ctx.ellipse(x, y, w * .3 * (1 - lift / 120), w * .09, 0, 0, 7); ctx.fill(); ctx.restore(); }
+  ctx.save(); ctx.translate(x, y - lift); ctx.rotate(rot); ctx.scale(flip ? -sx : sx, sy);
+  ctx.drawImage(im, -S.ax * w, -h, w, h);
+  if (owns("hat")) drawHat((S.hat[0] - S.ax) * w, -h + S.hat[1] * h + S.hw * k * .05, S.hw * k * .55);
+  ctx.restore();
+}
+function loop(now) { try { frame(now); } catch (e) { console.error(e); } requestAnimationFrame(loop); }
+
+/* ===================== desks + practice ===================== */
+const MASCOT = n => `<img class="face" src="${ASSETS["cat_" + n]}" alt="">`;
+function goDesk(d) {
+  walkTo(d.stand[0], d.stand[1], () => { hopTo(d.seat[0], d.seat[1] + 1, () => { cat.desk = d; cat.mode = "sit"; sfx("tick"); openSubject(d.s); }); });
+  hint(`走去${d.s}桌…`);
+}
+const sheet = $id("sheet"), sheetBody = $id("sheetBody"); let sheetOpen = false;
+function openSheet(html) { sheetBody.innerHTML = html; sheet.classList.add("open"); sheetOpen = true; hover = null; $id("hint").style.opacity = 0; sheet.scrollTop = 0; }
+function closeSheet() { sheet.classList.remove("open"); sheetOpen = false; $id("hint").style.opacity = 1; hint("點地板讓貓咪走過去，點書桌開始練習"); if (cat.desk) leaveSeat(); }
+$id("sheetX").onclick = closeSheet;
+addEventListener("keydown", e => { if (e.key === "Escape" && sheetOpen) closeSheet(); });
+const hint = t => $id("hint").textContent = t;
+let toastT = 0; const toast = t => { const el = $id("toast"); el.textContent = t; el.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 2600); };
+const coinI = s => `<span class="coin" style="width:${s}px;height:${s}px;vertical-align:-2px"></span>`;
+let Q = null;
+function openSubject(name) {
+  const s = SUBJ[name], st = progress.stats[name] || { right: 0, total: 0 }, ago = daysAgo(name);
+  openSheet(`<div class="stack"><div class="headrow">${MASCOT(s.ready ? "front" : "sit")}<div><h2><span class="dot" style="background:${s.css}"></span>${name}桌</h2>
+    <p class="dim">第一次評量比較弱的地方</p></div></div><div class="chips">${s.weak.map(w => `<span class="chip">${w}</span>`).join("")}</div>
+    ${s.ready ? `<p>一輪 5 題，答對一題 ${coinI(14)} +10，全對再加 20。答錯會馬上看到說明，最後還可以再練一次錯的。</p>${st.total ? `<p class="dim">目前累計：答對 ${st.right} / ${st.total} 題${ago != null ? `・${ago === 0 ? "今天練過" : `上次練習是 ${ago} 天前`}` : ""}</p>` : ""}<div class="row"><button class="btn" id="go">開始練習</button></div>` : `<p>這張桌子的題目還在準備中。等第二次段考的範圍出來，就會放上題目。</p><div class="row"><button class="btn ghost" id="close2">好</button></div>`}</div>`);
+  if (s.ready) $id("go").onclick = () => startRound(name); else $id("close2").onclick = closeSheet;
+}
+function startRound(name, kinds = ROUND[name], review = false) { Q = { name, kinds: kinds.slice(), i: 0, log: [], earned: 0, review }; showQ(); }
+function showQ() {
+  if (Q.i >= Q.kinds.length) return endRound();
+  const item = (Q.name === "社會" ? SOC : MATH)[Q.kinds[Q.i]](); Q.cur = item;
+  openSheet(`<div class="stack"><div class="qmeta"><span>${Q.name}${Q.review ? "・複習" : ""}・${item.kind}</span><span>第 ${Q.i + 1} / ${Q.kinds.length} 題</span></div>
+    <div class="q">${item.q}</div><div class="opts">${item.opts.map((o, i) => `<button class="opt" data-i="${i}"><span class="k">${"ABCD"[i]}</span><span>${o}</span></button>`).join("")}</div><div id="fb"></div></div>`);
+  sheet.querySelectorAll(".opt").forEach(b => b.onclick = () => answer(+b.dataset.i, b));
+}
+function answer(i, btn) {
+  const it = Q.cur, ok = i === it.ci;
+  sheet.querySelectorAll(".opt").forEach((b, k) => { b.disabled = true; if (k === it.ci) b.classList.add("right"); if (k === i && !ok) b.classList.add("wrong"); });
+  Q.log.push({ text: it.text, kind: Q.kinds[Q.i], ok, given: it.opts[i], correct: it.opts[it.ci], why: it.why });
+  const st = progress.stats[Q.name] = progress.stats[Q.name] || { right: 0, total: 0 }; st.total++; if (ok) { st.right++; daily().right++; }
+  if (ok) { Q.earned += 10; addPoints(10, btn); sfx("ding"); } else sfx("buzz");
+  $id("fb").innerHTML = `<div class="fb ${ok ? "ok" : "no"}"><img class="face sm pop" src="${ASSETS[ok ? "cat_happy" : "cat_sad"]}" alt=""><div><h3>${ok ? "答對了！" : "沒關係，看一下說明"}</h3><p>${it.why}</p>${ok ? "" : `<p>正確答案：<b>${it.opts[it.ci]}</b></p>`}</div></div><div class="row" style="margin-top:10px"><button class="btn mint" id="nextQ">${Q.i + 1 < Q.kinds.length ? "下一題" : "看結果"}</button></div>`;
+  $id("nextQ").onclick = () => { Q.i++; showQ(); };
+  $id("fb").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
+  saveProgress(); refreshTags();
+}
+function endRound() {
+  const right = Q.log.filter(r => r.ok).length, wrong = Q.log.filter(r => !r.ok), perfect = right === Q.log.length;
+  if (perfect && !Q.review) { Q.earned += 20; addPoints(20, null); }
+  const dl = daily(); dl.rounds++; if (!dl.subj.includes(Q.name)) dl.subj.push(Q.name);
+  progress.last[Q.name] = new Date().toISOString();
+  if (perfect) { cat.cheer = performance.now() + 1800; sfx("chime"); }
+  saveProgress(); refreshTags();
+  if (DB) DB.collection("attempts").add({ level: `office-${Q.name}${Q.review ? "-review" : ""}`, name: `讀書辦公室・${Q.name}${Q.review ? "（複習）" : ""}`, review: Q.review, at: new Date().toISOString(), right, total: Q.log.length, passed: right >= Q.log.length - 1, misses: wrong.map(r => r.text), details: Q.log.map(r => ({ text: r.text, kind: r.kind, ok: r.ok, given: r.given, correct: r.correct })) }).catch(() => {});
+  openSheet(`<div class="stack"><div class="center"><img class="face pop" src="${ASSETS[perfect ? "cat_jump" : right >= 3 ? "cat_happy" : "cat_surprised"]}" alt="" style="width:96px"><h2 style="padding:0">${Q.name}${Q.review ? "複習" : ""}完成</h2>
+    <div class="big">${right} / ${Q.log.length}</div><p class="dim">這一輪拿到 ${coinI(14)} ${Q.earned} 點${perfect && !Q.review ? "（含全對獎勵 20）" : ""}</p></div>
+    ${wrong.length ? `<h3 class="sub" style="color:var(--pink-d)">複習：答錯的題目</h3>${wrong.map(r => `<div class="rv"><div>✗ ${r.text}</div><div>你選的：<b>${r.given}</b></div><div>正確答案：<b class="ok-t">${r.correct}</b></div><div class="rv-why">${r.why}</div></div>`).join("")}<p class="dim">3 天後再回來練一次，確認真的記住了。</p>` : `<p class="dim" style="text-align:center">全部答對！貓咪開心得跳起來了。</p>`}
+    ${TASKS.some(t => t.done(dl) && !dl.claimed.includes(t.id)) ? `<p class="dim" style="text-align:center">有任務完成了，記得去「今日任務」領點數！</p>` : ""}
+    <div class="row">${wrong.length ? `<button class="btn" id="rev">用新的題目再練一次錯的（${wrong.length} 題）</button>` : ""}<button class="btn ${wrong.length ? "ghost" : "mint"}" id="again">再來一輪</button><button class="btn ghost" id="done">離開座位</button></div></div>`);
+  if (wrong.length) $id("rev").onclick = () => startRound(Q.name, wrong.map(r => r.kind), true);
+  $id("again").onclick = () => startRound(Q.name); $id("done").onclick = closeSheet;
+}
+
+/* ===================== today's tasks ===================== */
+const TASKS = [
+  { id: "round", nm: "完成 1 輪練習", done: d => d.rounds >= 1, prog: d => `${Math.min(d.rounds, 1)} / 1`, pts: 10 },
+  { id: "right10", nm: "今天答對 10 題", done: d => d.right >= 10, prog: d => `${Math.min(d.right, 10)} / 10`, pts: 10 },
+  { id: "two", nm: "練習 2 個不同的科目", done: d => d.subj.length >= 2, prog: d => `${Math.min(d.subj.length, 2)} / 2`, pts: 15 }
+];
+function daily() { const t = todayStr(); if (!progress.daily || progress.daily.date !== t) progress.daily = { date: t, rounds: 0, right: 0, subj: [], claimed: [] }; return progress.daily; }
+function daysAgo(name) { const l = progress.last[name]; if (!l) return null; const a = new Date(l); a.setHours(0, 0, 0, 0); const b = new Date(); b.setHours(0, 0, 0, 0); return Math.round((b - a) / 864e5); }
+function openTasks() {
+  const d = daily();
+  const due = Object.keys(SUBJ).filter(n => SUBJ[n].ready).map(n => ({ n, a: daysAgo(n) }));
+  openSheet(`<div class="stack"><div class="headrow">${MASCOT("walk")}<div><h2>今日任務</h2><p class="dim">每天都會換新的。完成後按「領取」拿點數。</p></div></div>
+    <div class="tasks">${TASKS.map(t => { const ok = t.done(d), got = d.claimed.includes(t.id); return `<div class="task${got ? " done" : ""}"><span class="ck">${got ? "✓" : ""}</span><span class="tx">${t.nm}<small>${t.prog(d)}・${coinI(12)} ${t.pts}</small></span>${got ? `<span class="dim">已領取</span>` : `<button class="btn${ok ? " mint" : " ghost"}" data-t="${t.id}" ${ok ? "" : "disabled"}>領取</button>`}</div>`; }).join("")}</div>
+    <h3 class="sub">複習提醒</h3><div class="chips">${due.map(x => `<span class="chip${x.a == null || x.a >= 3 ? " due" : ""}">${x.n}：${x.a == null ? "還沒練過" : x.a === 0 ? "今天練過" : `${x.a} 天前`}${x.a != null && x.a >= 3 ? "・該複習了" : ""}</span>`).join("")}</div>
+    <p class="dim">練完 3 天後再練一次，比較記得住。</p></div>`);
+  sheet.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { const t = TASKS.find(x => x.id === b.dataset.t); if (!t || !t.done(d) || d.claimed.includes(t.id)) return; d.claimed.push(t.id); addPoints(t.pts, b); sfx("chime"); saveProgress(); refreshTags(); setTimeout(openTasks, 850); });
+}
+
+/* ===================== points + prize shop ===================== */
+const PRIZES = [
+  { id: "hat", em: "🧢", nm: "船長帽", ds: "戴在貓咪頭上", cost: 60 },
+  { id: "catPillow", em: "🐱", nm: "貓咪抱枕", ds: "放在粉紅懶骨頭上", cost: 30 },
+  { id: "bigPlant", em: "🪴", nm: "大盆栽", ds: "擺在教室中間", cost: 40 },
+  { id: "neonStudy", em: "💡", nm: "「讀書中」霓虹燈", ds: "掛在牆上，會一閃一閃", cost: 80 },
+  { id: "stars", em: "✨", nm: "星星吊飾", ds: "整間教室飄著小星星", cost: 100 },
+  { id: "pet", em: "🦜", nm: "鸚鵡小跟班", ds: "跟著貓咪飛來飛去", cost: 150 }
+];
+let progress = { points: 0, owned: [], stats: {}, daily: null, last: {} };
+const owns = id => progress.owned.includes(id);
+function applyOwned() { rebuildGrid(); }
+function paintPoints(bump) { $id("ptsN").textContent = progress.points; if (bump) { const el = $id("pts"); el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); } }
+function addPoints(n, fromEl) {
+  progress.points += n;
+  if (fromEl && !reduceMotion) { const r = fromEl.getBoundingClientRect(), t = $id("pts").getBoundingClientRect(); const c = document.createElement("span"); c.className = "coin fly"; c.style.left = `${r.left + 20}px`; c.style.top = `${r.top + 10}px`; document.body.append(c); requestAnimationFrame(() => { c.style.transform = `translate(${t.left - r.left - 10}px, ${t.top - r.top - 4}px) scale(.8)`; c.style.opacity = .4; }); setTimeout(() => { c.remove(); paintPoints(true); sfx("coin"); }, 800); }
+  else paintPoints(true);
+}
+function openShop() {
+  openSheet(`<div class="stack"><div class="headrow">${MASCOT("happy")}<div><h2>集點換獎</h2><p>你有 <b style="color:var(--butter-d);font-weight:400">${progress.points}</b> 點。在書桌答對題目就能賺點數。</p></div></div>
+    <div class="shop">${PRIZES.map(p => { const own = owns(p.id); return `<div class="prize${own ? " owned" : ""}"><div class="em">${p.em}</div><div class="nm">${p.nm}</div><div class="ds">${p.ds}</div>${own ? `<div class="dim">已擁有</div>` : `<div class="cost">${coinI(14)}${p.cost}</div><button class="btn${progress.points < p.cost ? " ghost" : ""}" data-id="${p.id}" ${progress.points < p.cost ? "disabled" : ""}>兌換</button>`}</div>`; }).join("")}</div></div>`);
+  sheet.querySelectorAll("[data-id]").forEach(b => b.onclick = () => buy(b.dataset.id));
+}
+function buy(id) { const p = PRIZES.find(x => x.id === id); if (!p || progress.points < p.cost || owns(id)) return; progress.points -= p.cost; progress.owned.push(id); paintPoints(true); applyOwned(); saveProgress(); sfx("chime"); toast(`兌換成功：${p.nm}！`); openShop(); }
+
+/* ---------- saving: same place and format as before, plus today's tasks ---------- */
+let DB = null;
+async function loadProgress() {
+  try { DB = window.claude && window.claude.use ? await Promise.race([window.claude.use("db"), sleep(10000).then(() => null)]) : null; } catch (e) { DB = null; }
+  try {
+    if (DB) { const snap = await DB.collection("progress").doc("me").get(); const d = snap && snap.data && snap.data(); if (d) progress = Object.assign(progress, d); }
+    else { const raw = localStorage.getItem("office-progress"); if (raw) progress = Object.assign(progress, JSON.parse(raw)); }
+  } catch (e) {}
+  progress.last = progress.last || {}; progress.stats = progress.stats || {}; progress.owned = progress.owned || [];
+  paintPoints(false); applyOwned(); refreshTags();
+}
+let saveT = 0;
+function saveProgress() { clearTimeout(saveT); saveT = setTimeout(async () => { const data = { points: progress.points, owned: progress.owned, stats: progress.stats, daily: progress.daily, last: progress.last, updated: new Date().toISOString() }; try { if (DB) await DB.collection("progress").doc("me").set(data); else localStorage.setItem("office-progress", JSON.stringify(data)); } catch (e) { toast("進度暫時沒有存到"); } }, 400); }
+
+/* ---------- sound ---------- */
+let AC = null, soundOn = true;
+function sfx(type) {
+  if (!soundOn) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === "suspended") AC.resume();
+    const t = AC.currentTime, tone = (f0, f1, d, wave, vol, at = 0) => { const o = AC.createOscillator(), g = AC.createGain(); o.type = wave; o.frequency.setValueAtTime(f0, t + at); o.frequency.exponentialRampToValueAtTime(f1, t + at + d); g.gain.setValueAtTime(vol, t + at); g.gain.exponentialRampToValueAtTime(.0008, t + at + d); o.connect(g).connect(AC.destination); o.start(t + at); o.stop(t + at + d + .02); };
+    if (type === "tick") tone(1300, 1000, .05, "triangle", .05);
+    if (type === "ding") { tone(880, 880, .2, "sine", .08); tone(1320, 1320, .3, "sine", .07, .1); }
+    if (type === "buzz") tone(320, 200, .22, "triangle", .06);
+    if (type === "coin") { tone(1568, 1568, .08, "square", .03); tone(2093, 2093, .2, "square", .03, .07); }
+    if (type === "chime") [784, 988, 1318, 1568].forEach((f, i) => tone(f, f, .4, "sine", .06, i * .08));
+  } catch (e) {}
+}
+$id("fs").onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch (e) { toast("這個畫面不支援全螢幕，可以把手機轉橫看看"); } setTimeout(resize, 300); };
+if (!document.fullscreenEnabled) $id("fs").hidden = true;
+$id("snd").onclick = () => { soundOn = !soundOn; $id("snd").textContent = soundOn ? "🔊" : "🔇"; };
+const DAYS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+function tickClock() { const d = new Date(); $id("clock").textContent = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; $id("dayname").textContent = DAYS[d.getDay()]; }
+
+/* ---------- boot ---------- */
+(async () => {
+  tickClock(); setInterval(tickClock, 15000);
+  try { await loadAll(p => { $id("loadBar").style.width = `${Math.round(p * 100)}%`; }); }
+  catch (e) { $id("loadT").textContent = "圖片載入失敗，請重新整理一次"; return; }
+  rebuildGrid(); resize(); vcx = cat.x; vcy = cat.y - 60; clampView();
+  refreshTags(); $id("loading").hidden = true; last = performance.now(); requestAnimationFrame(loop);
+  await loadProgress();
+  toast("喵～點書桌，貓咪就會走過去坐下來練習");
+})();
+</script>
