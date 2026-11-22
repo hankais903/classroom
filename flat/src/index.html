@@ -310,7 +310,7 @@ function hopTo(x, y, cb) { cat.hop = { x0: cat.x, y0: cat.y, x1: x, y1: y, t: 0,
 function leaveSeat() {
   if (cat.desk) { const d = cat.desk, p = cat.side || seatSides(d)[0]; cat.desk = null; cat.x = p[0]; cat.y = p[1]; cat.flip = p === seatSides(d)[1] ? false : true; }
   if (cat.perch) { const s = cat.perch; cat.perch = null; cat.x = s.go[0]; cat.y = s.go[1]; }
-  cat.hop = null; cat.mode = "stand"; cat.face = "front";
+  cat.hop = null; cat.hopDesk = null; cat.mode = "stand"; cat.face = "front";
 }
 
 /* ===================== view: cover the screen, follow the cat, drag / zoom ===================== */
@@ -478,6 +478,13 @@ function frame(now) {
   const list = OCC.map(o => ({ n: o.n, base: o.base, box: [o.x, o.y, o.x + IMG["occ_" + o.n].width, o.y + IMG["occ_" + o.n].height], draw: () => drawPiece(o) }));
   if (owns("bigPlant")) list.push({ n: "bigPlant", base: 566, box: [940, 420, 1030, 566], draw: () => drawPlant(985, 566) });
   if (owns("catPillow")) list.push({ n: "catPillow", base: 612, box: [215, 545, 285, 605], draw: () => { const im = IMG.cat_happy, h = 46, w = h * im.width / im.height; ctx.save(); ctx.translate(250, 600); ctx.rotate(-.12); ctx.drawImage(im, -w / 2, -h, w, h); ctx.restore(); } });
+  const sd = cat.desk || cat.hopDesk;
+  if (sd) {
+    const i = list.findIndex(o => o.n === sd.chair), o = OCC.find(o => o.n === sd.chair), box = list[i].box;
+    list.splice(i, 1,
+      { n: "seat", base: o.base - .01, box, draw: () => ctx.drawImage(IMG["seat_" + o.n], o.x, o.y) },
+      { n: "back", base: o.base, box, draw: () => ctx.drawImage(IMG["back_" + o.n], o.x, o.y) });
+  }
   list.sort((a, b) => a.base - b.base);
   const cb = catBox(now), at = list.findIndex(o => o.box[0] < cb[2] && o.box[2] > cb[0] && o.box[1] < cb[3] && o.box[3] > cb[1] && inFrontOfCat(o, cb));
   const cut = at < 0 ? list.length : at;
@@ -497,7 +504,8 @@ function frame(now) {
 // is this piece of scenery nearer to the viewer than the cat? Compare her feet with its floor footprint along each screen column
 function colRange(q, x) { let lo = Infinity, hi = -Infinity; for (let i = 0; i < q.length; i++) { const a = q[i], b = q[(i + 1) % q.length]; if ((a[0] - x) * (b[0] - x) > 0 || a[0] === b[0]) continue; const y = a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]); lo = Math.min(lo, y); hi = Math.max(hi, y); } return lo <= hi ? [lo, hi] : null; }
 function inFrontOfCat(o, cb) {
-  if (cat.desk) { if (o.n === cat.desk.chair) return true; if (o.n === cat.desk.desk) return false; }
+  const sd = cat.desk || cat.hopDesk;
+  if (sd) { if (o.n === "back") return true; if (o.n === "seat" || o.n === sd.desk) return false; }
   const fx = cb[4], fy = cb[5], q = FOOT[o.n];
   if (!q) return fy < o.base;
   const hw = (cb[2] - cb[0]) * .3; let front = false, behind = false;
@@ -521,32 +529,72 @@ function drawPiece(o) {
   if (lit) ctx.restore();
   if (SCREENS[o.n]) drawScreen(o.n, performance.now() / 1000);
 }
-// monitor glass: a soft blue glow, a light sweep, twinkles; the desk the cat sits at shows its subject and typing lines
-const scrCv = {};
+// monitor glass: glow + a little show that changes every few seconds (chart, typing, hearts, loading, bouncing star, clock);
+// the desk the cat sits at shows its subject, typing, and a big ✓ when she answers right
+const scrCv = {}, scrFx = {};
+const PROGS = ["chart", "type", "hearts", "load", "bounce", "clock"];
+const PAL = ["#ff9fb2", "#ffd36e", "#9bd9b4", "#a9d4f5", "#c7b8f0"];
+function star(g, x, y, r, pts = 5) { g.beginPath(); for (let k = 0; k < pts * 2; k++) { const rr = k % 2 ? r * .45 : r, an = k * Math.PI / pts - Math.PI / 2; g.lineTo(x + Math.cos(an) * rr, y + Math.sin(an) * rr); } g.closePath(); }
+function heart(g, x, y, r) { g.beginPath(); g.moveTo(x, y + r * .9); g.bezierCurveTo(x - r * 1.6, y - r * .2, x - r * .6, y - r * 1.3, x, y - r * .4); g.bezierCurveTo(x + r * .6, y - r * 1.3, x + r * 1.6, y - r * .2, x, y + r * .9); g.closePath(); }
+function drawProg(g, prog, w, h, u, t, i0) {
+  // u: 0..1 progress through this program's slot
+  g.lineJoin = "round"; g.lineCap = "round"; g.strokeStyle = "rgba(74,51,40,.85)"; g.lineWidth = 2;
+  if (prog === "chart") {
+    const n = 4, bw = w * .13, gap = w * .07, x0 = (w - n * bw - (n - 1) * gap) / 2, base = h * .84;
+    for (let i = 0; i < n; i++) { const v = .25 + .55 * (.5 + .5 * Math.sin(t * 2.2 + i * 1.3 + i0)); const bh = h * .62 * v * Math.min(1, u * 4); g.fillStyle = PAL[(i + i0) % 5]; g.beginPath(); g.roundRect(x0 + i * (bw + gap), base - bh, bw, bh, 3); g.fill(); g.stroke(); }
+    g.beginPath(); g.moveTo(w * .1, base); g.lineTo(w * .9, base); g.stroke();
+  } else if (prog === "type") {
+    const total = 5, shown = u * total * 1.3;
+    for (let i = 0; i < total; i++) { const f = Math.max(0, Math.min(1, shown - i)); if (!f) break; const lw = w * (.66 - (i % 3) * .12) * f; g.fillStyle = i === 0 ? PAL[i0 % 5] : "rgba(255,255,255,.95)"; g.beginPath(); g.roundRect(w * .14, h * (.16 + i * .15), lw, h * .08, 3); g.fill(); if (f < 1 && Math.sin(t * 12) > 0) { g.fillStyle = "rgba(74,51,40,.85)"; g.fillRect(w * .14 + lw + 2, h * (.14 + i * .15), 2.5, h * .12); } }
+  } else if (prog === "hearts") {
+    for (let i = 0; i < 6; i++) { const k = (t * .45 + i / 6) % 1, x = w * (.15 + .7 * ((i * 37 + i0 * 11) % 10) / 10) + Math.sin(t * 3 + i) * 4, y = h * (1.05 - k * 1.1), r = 5 + (i % 3) * 2; g.globalAlpha = Math.sin(k * Math.PI); g.fillStyle = PAL[(i + i0) % 2 ? 0 : 4]; heart(g, x, y, r); g.fill(); g.lineWidth = 1.5; g.stroke(); }
+    g.globalAlpha = 1;
+  } else if (prog === "load") {
+    const f = Math.min(1, u * 1.35), bw = w * .7, x0 = w * .15, y0 = h * .5;
+    g.fillStyle = "rgba(255,255,255,.9)"; g.beginPath(); g.roundRect(x0, y0, bw, h * .16, 7); g.fill(); g.stroke();
+    g.fillStyle = PAL[(i0 + 1) % 5]; g.beginPath(); g.roundRect(x0 + 2, y0 + 2, Math.max(0, (bw - 4) * f), h * .16 - 4, 5); g.fill();
+    g.font = `${Math.round(h * .2)}px Huninn, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "rgba(74,51,40,.9)";
+    g.fillText(f < 1 ? `${Math.round(f * 100)}%` : "完成！", w / 2, h * .3);
+  } else if (prog === "bounce") {
+    const k = (t * 1.6 + i0) % 2, x = w * (.15 + .7 * Math.abs(((t * .35 + i0 * .3) % 2) - 1)), y = h * .78 - Math.abs(Math.sin(k * Math.PI / 2 * 2)) * h * .5;
+    g.fillStyle = "rgba(74,51,40,.15)"; g.beginPath(); g.ellipse(x, h * .85, 9, 3, 0, 0, 7); g.fill();
+    g.save(); g.translate(x, y); g.rotate(t * 3); g.fillStyle = "#ffd36e"; star(g, 0, 0, 10); g.fill(); g.stroke(); g.restore();
+  } else if (prog === "clock") {
+    const d = new Date(), txt = `${String(d.getHours()).padStart(2, "0")}${Math.sin(t * 6) > 0 ? ":" : " "}${String(d.getMinutes()).padStart(2, "0")}`;
+    g.font = `${Math.round(h * .34)}px Huninn, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.lineWidth = 3; g.strokeText(txt, w / 2, h * .45); g.fillStyle = "#ffffff"; g.fillText(txt, w / 2, h * .45);
+    g.font = `${Math.round(h * .16)}px Huninn, sans-serif`; g.fillStyle = "rgba(74,51,40,.85)"; g.fillText("加油！", w / 2, h * .76);
+  }
+}
+function screenPop(desk) { scrFx[desk] = performance.now() / 1000; }
 function drawScreen(n, t) {
-  const m = IMG["scr_" + n], { x, y } = SCREENS[n], w = m.width, h = m.height, ph = n.charCodeAt(4) * 1.7;
+  const m = IMG["scr_" + n], { x, y } = SCREENS[n], w = m.width, h = m.height, i0 = +n.slice(4), ph = i0 * 1.7;
   const d = DESKS.find(d => d.desk === n), on = cat.desk === d, still = reduceMotion;
   if (!scrCv[n]) { const c = document.createElement("canvas"); c.width = w; c.height = h; scrCv[n] = c; }
   const c = scrCv[n], g = c.getContext("2d"), pulse = still ? .5 : .5 + .5 * Math.sin(t * 2 + ph);
-  // glow around the glass
   ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.shadowColor = on ? `rgba(255,220,140,${.55 + .35 * pulse})` : `rgba(140,205,255,${.35 + .3 * pulse})`; ctx.shadowBlur = on ? 26 : 20; ctx.globalAlpha = .26 + .14 * pulse; ctx.drawImage(m, x, y); ctx.restore();
-  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = "source-over"; g.clearRect(0, 0, w, h);
-  g.fillStyle = on ? hexA(SUBJ[d.s].css, .28) : `rgba(190,230,255,${.06 + .06 * pulse})`; g.fillRect(0, 0, w, h);
-  // diagonal light sweep
-  const sx = still ? w * .3 : ((t * .32 + ph) % 1.8 - .4) * w * 1.6;
-  const gr = g.createLinearGradient(sx - 24, 0, sx + 24, h * .4); gr.addColorStop(0, "rgba(255,255,255,0)"); gr.addColorStop(.5, "rgba(255,255,255,.55)"); gr.addColorStop(1, "rgba(255,255,255,0)");
-  g.fillStyle = gr; g.beginPath(); g.moveTo(sx - 30, 0); g.lineTo(sx + 6, 0); g.lineTo(sx - 30, h); g.lineTo(sx - 66, h); g.closePath(); g.fill();
-  // twinkles
-  g.fillStyle = "#ffffff";
-  for (let i = 0; i < 3; i++) { const a = still ? .6 : Math.max(0, Math.sin(t * 2.6 + ph + i * 2.1)); if (a < .05) continue; const px = w * (.18 + .3 * i), py = h * (.22 + .18 * ((i * 7) % 3)), r = 3 + 3 * a; g.globalAlpha = a; g.beginPath(); for (let k = 0; k < 8; k++) { const rr = k % 2 ? r * .3 : r, an = k * Math.PI / 4; g.lineTo(px + Math.cos(an) * rr, py + Math.sin(an) * rr); } g.closePath(); g.fill(); }
-  g.globalAlpha = 1;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = "source-over"; g.clearRect(0, 0, w, h);
+  // panel behind the show, so the drawing reads on top of the bunny wallpaper
+  g.fillStyle = on ? hexA(SUBJ[d.s].css, .55) : `rgba(225,242,255,${.55 + .1 * pulse})`; g.fillRect(0, 0, w, h);
+  // scanline shimmer
+  if (!still) { g.fillStyle = "rgba(255,255,255,.18)"; const sy = (t * 22 + ph * 9) % (h + 10) - 5; g.fillRect(0, sy, w, 3); }
+  const T = still ? 2 : t + i0 * 2.3;
   if (on) {
-    g.font = `${Math.round(h * .26)}px Huninn, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.lineWidth = 3; g.strokeStyle = "rgba(74,51,40,.85)"; g.strokeText(d.s, w / 2, h * .32); g.fillText(d.s, w / 2, h * .32);
-    const lines = still ? 3 : 1 + Math.floor(t * 1.5) % 4;
-    for (let i = 0; i < lines; i++) { g.fillStyle = "rgba(255,255,255,.9)"; g.fillRect(w * .2, h * (.56 + i * .11), w * (i === lines - 1 && !still ? .15 + .4 * ((t * 1.5) % 1) : .55 - i * .08), h * .055); }
+    g.font = `${Math.round(h * .24)}px Huninn, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.lineWidth = 3; g.strokeStyle = "rgba(74,51,40,.85)"; g.strokeText(d.s, w / 2, h * .24); g.fillStyle = "#fff"; g.fillText(d.s, w / 2, h * .24);
+    drawProg(g, "type", w, h * .95, still ? 1 : (t * .3) % 1, t, i0);
+    const pop = scrFx[n] ? t - scrFx[n] : 9;
+    if (pop < 1.4) { const k = Math.min(1, pop * 5), a = pop < 1 ? 1 : 1 - (pop - 1) / .4; g.globalAlpha = a; g.fillStyle = "rgba(155,217,180,.9)"; g.fillRect(0, 0, w, h); g.save(); g.translate(w / 2, h / 2); g.scale(k, k); g.lineWidth = 7; g.strokeStyle = "#ffffff"; g.beginPath(); g.moveTo(-14, 0); g.lineTo(-4, 11); g.lineTo(16, -12); g.stroke(); g.restore();
+      g.fillStyle = "#ffe48a"; for (let i = 0; i < 6; i++) { const an = i * Math.PI / 3 + pop * 2, rr = 18 + pop * 26; star(g, w / 2 + Math.cos(an) * rr, h / 2 + Math.sin(an) * rr * .7, 4, 4); g.fill(); } g.globalAlpha = 1; }
+  } else {
+    const SLOT = 6, k = T / SLOT, pi = Math.floor(k), u = k - pi, prog = PROGS[(pi + i0) % PROGS.length];
+    const fade = still ? 1 : Math.min(1, u * 8, (1 - u) * 8);
+    g.globalAlpha = fade; drawProg(g, prog, w, h, u, t, i0); g.globalAlpha = 1;
   }
+  // light sweep + twinkle
+  const sx = still ? w * .3 : ((t * .32 + ph) % 1.8 - .4) * w * 1.6;
+  const gr = g.createLinearGradient(sx - 24, 0, sx + 24, h * .4); gr.addColorStop(0, "rgba(255,255,255,0)"); gr.addColorStop(.5, "rgba(255,255,255,.45)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = gr; g.beginPath(); g.moveTo(sx - 30, 0); g.lineTo(sx + 6, 0); g.lineTo(sx - 30, h); g.lineTo(sx - 66, h); g.closePath(); g.fill();
   g.globalCompositeOperation = "destination-in"; g.drawImage(m, 0, 0);
-  ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.drawImage(c, x, y); ctx.restore();
+  ctx.drawImage(c, x, y);
 }
 const hexA = (hex, a) => `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
 
@@ -580,16 +628,20 @@ function drawWeather(t, dt) {
   g.globalCompositeOperation = "destination-in"; g.drawImage(m, 0, 0);
   ctx.drawImage(winCv, WINDOW.x, WINDOW.y);
 }
+function catSize() {
+  if (cat.hopDesk && cat.hop) { const a = catH(cat.hop.y0), b = catH(occ(cat.hopDesk.chair).base) * .8; return a + (b - a) * cat.hop.t; }
+  return catH(cat.desk ? occ(cat.desk.chair).base : cat.perch ? cat.perch.perch[1] : cat.y);
+}
 function catBox(now) {
   const name = catSprite(now), S = SPR[name], im = IMG["cat_" + name];
-  let x = cat.x, y = cat.y, H = catH(cat.desk ? occ(cat.desk.chair).base : cat.perch ? cat.perch.perch[1] : cat.y);
+  let x = cat.x, y = cat.y, H = catSize();
   if (cat.desk) { x = cat.desk.seat[0]; y = cat.desk.seat[1]; H *= .8; }
   const k = H / 290 * S.k, w = im.width * k, h = im.height * k;
   return [x - S.ax * w, y - h - 40, x + (1 - S.ax) * w, y, x, y];
 }
 function drawCat(now, t) {
   const name = catSprite(now), S = SPR[name], im = IMG["cat_" + name];
-  let x = cat.x, y = cat.y, H = catH(cat.desk ? occ(cat.desk.chair).base : cat.perch ? cat.perch.perch[1] : cat.y);
+  let x = cat.x, y = cat.y, H = catSize();
   if (cat.desk) { x = cat.desk.seat[0]; y = cat.desk.seat[1]; H *= .8; }
   
   const k = H / 290 * S.k, w = im.width * k, h = im.height * k;
@@ -621,7 +673,7 @@ const pathLen = p => { let L = 0; for (let i = 1; i < (p || []).length; i++) L +
 function goDesk(d) {
   leaveSeat();
   const [L, R] = seatSides(d), side = pathLen(astar(cat.x, cat.y, ...L)) <= pathLen(astar(cat.x, cat.y, ...R)) ? L : R;
-  walkTo(side[0], side[1], () => { cat.side = side; hopTo(d.seat[0], d.seat[1] + 1, () => { cat.desk = d; cat.mode = "sit"; sfx("tick"); openSubject(d.s); }); });
+  walkTo(side[0], side[1], () => { cat.side = side; cat.hopDesk = d; hopTo(d.seat[0], d.seat[1] + 1, () => { cat.hopDesk = null; cat.desk = d; cat.mode = "sit"; sfx("tick"); openSubject(d.s); }); });
   hint(`走去${d.s}桌…`);
 }
 const sheet = $id("sheet"), sheetBody = $id("sheetBody"); let sheetOpen = false;
@@ -653,7 +705,7 @@ function answer(i, btn) {
   sheet.querySelectorAll(".opt").forEach((b, k) => { b.disabled = true; if (k === it.ci) b.classList.add("right"); if (k === i && !ok) b.classList.add("wrong"); });
   Q.log.push({ text: it.text, kind: Q.kinds[Q.i], ok, given: it.opts[i], correct: it.opts[it.ci], why: it.why });
   const st = progress.stats[Q.name] = progress.stats[Q.name] || { right: 0, total: 0 }; st.total++; if (ok) { st.right++; daily().right++; }
-  if (ok) { Q.earned += 10; addPoints(10, btn); sfx("ding"); } else sfx("buzz");
+  if (ok) { Q.earned += 10; addPoints(10, btn); sfx("ding"); const dd = DESKS.find(x => x.s === Q.name); if (dd) screenPop(dd.desk); } else sfx("buzz");
   $id("fb").innerHTML = `<div class="fb ${ok ? "ok" : "no"}"><img class="face sm pop" src="${ASSETS[ok ? "cat_happy" : "cat_sad"]}" alt=""><div><h3>${ok ? "答對了！" : "沒關係，看一下說明"}</h3><p>${it.why}</p>${ok ? "" : `<p>正確答案：<b>${it.opts[it.ci]}</b></p>`}</div></div><div class="row" style="margin-top:10px"><button class="btn mint" id="nextQ">${Q.i + 1 < Q.kinds.length ? "下一題" : "看結果"}</button></div>`;
   $id("nextQ").onclick = () => { Q.i++; showQ(); };
   $id("fb").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
