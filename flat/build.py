@@ -12,7 +12,7 @@ for f in sorted(A.glob("*.webp")):
 occ = json.loads((A / "occ.json").read_text())
 html = (ROOT / "src" / "index.html").read_text(encoding="utf-8")
 foot = json.loads((A / "foot.json").read_text())
-html = html.replace("/*ASSETS*/{}", json.dumps(assets)).replace("/*OCC*/[]", json.dumps(occ)).replace("/*FOOT*/{}", json.dumps(foot))
+html = html.replace("/*ASSETS*/{}", json.dumps(assets)).replace("/*OCC*/[]", json.dumps(occ)).replace("/*FOOT*/{}", json.dumps(foot)).replace("/*SCREENS*/{}", (A / "screens.json").read_text()).replace("/*WINDOW*/{}", (A / "window.json").read_text())
 out = ROOT / "dist" / "study-office.html"
 out.parent.mkdir(exist_ok=True)
 out.write_text(html, encoding="utf-8")

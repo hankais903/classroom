@@ -99,7 +99,7 @@ h3.sub { margin: 4px 0 0; font-weight: 400; font-size: 1.05rem; }
   <div class="pill"><span class="t" id="clock">--:--</span><small id="dayname"></small></div>
   <div class="pill pts" id="pts"><span class="coin"></span><span id="ptsN">0</span></div>
   <button class="icon-btn" id="zoomIn" aria-label="放大">＋</button><button class="icon-btn" id="zoomOut" aria-label="縮小">－</button>
-  <button class="icon-btn" id="fs" aria-label="全螢幕">⛶</button><button class="icon-btn" id="snd" aria-label="聲音開關">🔊</button>
+  <button class="icon-btn" id="fs" aria-label="全螢幕">⛶</button><button class="icon-btn" id="snd" aria-label="聲音開關">🔊</button><button class="icon-btn" id="wx" aria-label="天氣：晴天，點一下換天氣">☀️</button>
 </div>
 <div class="hint" id="hint">點地板讓貓咪走過去，點書桌開始練習</div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="false"><button class="x" id="sheetX" aria-label="關閉">✕</button><div id="sheetBody"></div></div>
@@ -111,6 +111,8 @@ const ASSETS = /*ASSETS*/{};
 const OCC = /*OCC*/[];
 // floor footprint of each desk and chair: front-left, front-right, back-right, back-left leg tips
 const FOOT = /*FOOT*/{};
+const SCREENS = /*SCREENS*/{};   // top-left of each monitor's glass, by desk
+const WINDOW = /*WINDOW*/{};     // top-left of the outside-view mask
 const $id = id => document.getElementById(id);
 const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -306,7 +308,7 @@ function walkTo(x, y, cb) {
 }
 function hopTo(x, y, cb) { cat.hop = { x0: cat.x, y0: cat.y, x1: x, y1: y, t: 0, cb }; cat.mode = "hop"; }
 function leaveSeat() {
-  if (cat.desk) { const d = cat.desk; cat.desk = null; cat.x = d.stand[0]; cat.y = d.stand[1]; }
+  if (cat.desk) { const d = cat.desk, p = cat.side || seatSides(d)[0]; cat.desk = null; cat.x = p[0]; cat.y = p[1]; cat.flip = p === seatSides(d)[1] ? false : true; }
   if (cat.perch) { const s = cat.perch; cat.perch = null; cat.x = s.go[0]; cat.y = s.go[1]; }
   cat.hop = null; cat.mode = "stand"; cat.face = "front";
 }
@@ -468,6 +470,7 @@ function frame(now) {
   ctx.setTransform(scale, 0, 0, scale, cv.width / 2 - vcx * scale, cv.height / 2 - vcy * scale);
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
   ctx.drawImage(IMG.bg, 0, 0);
+  drawWeather(t, dt);
   if (owns("neonStudy")) drawNeon(704, 196, t);
   if (marker) { const k = 1 + Math.sin(t * 6) * .12; ctx.save(); ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(marker.x, marker.y, 14 * k, 8 * k, 0, 0, 7); ctx.fillStyle = "rgba(255,211,110,.45)"; ctx.fill(); ctx.stroke(); ctx.restore(); }
 
@@ -487,7 +490,7 @@ function frame(now) {
     ctx.restore();
   }
   // tags
-  DESKS.forEach(d => { if (tags[d.s]) placeTag(tags[d.s], d.tag[0], d.tag[1], cat.mode === "stand" && Math.hypot(cat.x - d.stand[0], cat.y - d.stand[1]) < 60 && !cat.desk); });
+  DESKS.forEach(d => { if (tags[d.s]) placeTag(tags[d.s], d.tag[0], d.tag[1], cat.mode === "stand" && !cat.desk && seatSides(d).some(p => Math.hypot(cat.x - p[0], cat.y - p[1]) < 60)); });
   if (tags.shop) placeTag(tags.shop, 1290, 470, cat.y < 680 && cat.x > 1150);
   if (tags.board) placeTag(tags.board, 1016, 236, false);
 }
@@ -516,6 +519,66 @@ function drawPiece(o) {
   if (lit) { ctx.save(); ctx.shadowColor = "rgba(255,240,170,1)"; ctx.shadowBlur = 18; }
   ctx.drawImage(IMG["occ_" + o.n], o.x, o.y);
   if (lit) ctx.restore();
+  if (SCREENS[o.n]) drawScreen(o.n, performance.now() / 1000);
+}
+// monitor glass: a soft blue glow, a light sweep, twinkles; the desk the cat sits at shows its subject and typing lines
+const scrCv = {};
+function drawScreen(n, t) {
+  const m = IMG["scr_" + n], { x, y } = SCREENS[n], w = m.width, h = m.height, ph = n.charCodeAt(4) * 1.7;
+  const d = DESKS.find(d => d.desk === n), on = cat.desk === d, still = reduceMotion;
+  if (!scrCv[n]) { const c = document.createElement("canvas"); c.width = w; c.height = h; scrCv[n] = c; }
+  const c = scrCv[n], g = c.getContext("2d"), pulse = still ? .5 : .5 + .5 * Math.sin(t * 2 + ph);
+  // glow around the glass
+  ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.shadowColor = on ? `rgba(255,220,140,${.55 + .35 * pulse})` : `rgba(140,205,255,${.35 + .3 * pulse})`; ctx.shadowBlur = on ? 26 : 20; ctx.globalAlpha = .26 + .14 * pulse; ctx.drawImage(m, x, y); ctx.restore();
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = "source-over"; g.clearRect(0, 0, w, h);
+  g.fillStyle = on ? hexA(SUBJ[d.s].css, .28) : `rgba(190,230,255,${.06 + .06 * pulse})`; g.fillRect(0, 0, w, h);
+  // diagonal light sweep
+  const sx = still ? w * .3 : ((t * .32 + ph) % 1.8 - .4) * w * 1.6;
+  const gr = g.createLinearGradient(sx - 24, 0, sx + 24, h * .4); gr.addColorStop(0, "rgba(255,255,255,0)"); gr.addColorStop(.5, "rgba(255,255,255,.55)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = gr; g.beginPath(); g.moveTo(sx - 30, 0); g.lineTo(sx + 6, 0); g.lineTo(sx - 30, h); g.lineTo(sx - 66, h); g.closePath(); g.fill();
+  // twinkles
+  g.fillStyle = "#ffffff";
+  for (let i = 0; i < 3; i++) { const a = still ? .6 : Math.max(0, Math.sin(t * 2.6 + ph + i * 2.1)); if (a < .05) continue; const px = w * (.18 + .3 * i), py = h * (.22 + .18 * ((i * 7) % 3)), r = 3 + 3 * a; g.globalAlpha = a; g.beginPath(); for (let k = 0; k < 8; k++) { const rr = k % 2 ? r * .3 : r, an = k * Math.PI / 4; g.lineTo(px + Math.cos(an) * rr, py + Math.sin(an) * rr); } g.closePath(); g.fill(); }
+  g.globalAlpha = 1;
+  if (on) {
+    g.font = `${Math.round(h * .26)}px Huninn, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.lineWidth = 3; g.strokeStyle = "rgba(74,51,40,.85)"; g.strokeText(d.s, w / 2, h * .32); g.fillText(d.s, w / 2, h * .32);
+    const lines = still ? 3 : 1 + Math.floor(t * 1.5) % 4;
+    for (let i = 0; i < lines; i++) { g.fillStyle = "rgba(255,255,255,.9)"; g.fillRect(w * .2, h * (.56 + i * .11), w * (i === lines - 1 && !still ? .15 + .4 * ((t * 1.5) % 1) : .55 - i * .08), h * .055); }
+  }
+  g.globalCompositeOperation = "destination-in"; g.drawImage(m, 0, 0);
+  ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.drawImage(c, x, y); ctx.restore();
+}
+const hexA = (hex, a) => `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
+
+// weather outside the windows: sunny drifting clouds, overcast, rain, snow
+const WEATHERS = [{ id: "sun", icon: "☀️", nm: "晴天" }, { id: "cloud", icon: "⛅", nm: "陰天" }, { id: "rain", icon: "🌧️", nm: "下雨" }, { id: "snow", icon: "❄️", nm: "下雪" }];
+let weather = "sun", weatherManual = false, weatherNext = 0, winCv = null;
+const clouds = Array.from({ length: 6 }, (_, i) => ({ x: i * 110 + Math.random() * 60, y: 20 + Math.random() * 110, s: .7 + Math.random() * .7, v: 4 + Math.random() * 5 }));
+const drops = Array.from({ length: 260 }, () => ({ x: Math.random() * 560, y: Math.random() * 290, v: 380 + Math.random() * 220, l: 12 + Math.random() * 12 }));
+const flakes = Array.from({ length: 200 }, () => ({ x: Math.random() * 560, y: Math.random() * 290, v: 18 + Math.random() * 26, r: 1.8 + Math.random() * 2.8, p: Math.random() * 6 }));
+function setWeather(id, manual) { weather = id; if (manual) weatherManual = true; const W = WEATHERS.find(w => w.id === id); const b = $id("wx"); if (b) { b.textContent = W.icon; b.setAttribute("aria-label", `天氣：${W.nm}，點一下換天氣`); } }
+function drawWeather(t, dt) {
+  const m = IMG.win_mask, w = m.width, h = m.height, still = reduceMotion;
+  if (!weatherManual && t > weatherNext) { if (weatherNext) setWeather(WEATHERS[(WEATHERS.findIndex(x => x.id === weather) + 1) % WEATHERS.length].id); weatherNext = t + 75; }
+  if (!winCv) { winCv = document.createElement("canvas"); winCv.width = w; winCv.height = h; }
+  const g = winCv.getContext("2d"); g.globalCompositeOperation = "source-over"; g.clearRect(0, 0, w, h);
+  const cloudCol = weather === "sun" ? "rgba(255,255,255,.9)" : weather === "snow" ? "rgba(240,244,252,.95)" : weather === "rain" ? "rgba(105,110,135,.95)" : "rgba(165,170,190,.95)";
+  if (weather !== "sun") { g.fillStyle = weather === "rain" ? "rgba(55,65,100,.62)" : weather === "snow" ? "rgba(205,215,235,.62)" : "rgba(130,135,160,.55)"; g.fillRect(0, 0, w, h); }
+  else { const gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, "rgba(255,240,190,.25)"); gr.addColorStop(.5, "rgba(255,240,190,0)"); g.fillStyle = gr; g.fillRect(0, 0, w, h); }
+  // clouds
+  g.fillStyle = cloudCol;
+  clouds.forEach(c => { if (!still) { c.x += c.v * dt * (weather === "rain" ? 2 : 1); if (c.x > w + 80) { c.x = -90; c.y = 20 + Math.random() * 110; } } const r = (weather === "sun" ? 22 : 30) * c.s; g.beginPath(); g.ellipse(c.x, c.y, r * 1.6, r * .7, 0, 0, 7); g.ellipse(c.x - r * .7, c.y + 4, r, r * .55, 0, 0, 7); g.ellipse(c.x + r * .8, c.y + 5, r * 1.1, r * .55, 0, 0, 7); g.ellipse(c.x + r * .1, c.y - r * .35, r * .9, r * .6, 0, 0, 7); g.fill(); });
+  if (weather === "rain") {
+    g.strokeStyle = "rgba(225,235,255,.9)"; g.lineWidth = 1.7; g.beginPath();
+    drops.forEach(d => { if (!still) { d.y += d.v * dt; d.x -= d.v * dt * .25; if (d.y > h) { d.y = -d.l; d.x = Math.random() * (w + 80); } } g.moveTo(d.x, d.y); g.lineTo(d.x + d.l * .25, d.y - d.l); }); g.stroke();
+  }
+  if (weather === "snow") {
+    g.fillStyle = "rgba(255,255,255,.95)";
+    flakes.forEach(f => { if (!still) { f.y += f.v * dt; f.x += Math.sin(t * 1.3 + f.p) * dt * 14; if (f.y > h) { f.y = -4; f.x = Math.random() * w; } } g.beginPath(); g.arc(f.x, f.y, f.r, 0, 7); g.fill(); });
+  }
+  if (weather === "rain" && !still && Math.sin(t * .7) > .995) { g.fillStyle = "rgba(255,255,255,.5)"; g.fillRect(0, 0, w, h); }
+  g.globalCompositeOperation = "destination-in"; g.drawImage(m, 0, 0);
+  ctx.drawImage(winCv, WINDOW.x, WINDOW.y);
 }
 function catBox(now) {
   const name = catSprite(now), S = SPR[name], im = IMG["cat_" + name];
@@ -546,8 +609,19 @@ function loop(now) { try { frame(now); } catch (e) { console.error(e); } request
 
 /* ===================== desks + practice ===================== */
 const MASCOT = n => `<img class="face" src="${ASSETS["cat_" + n]}" alt="">`;
+// the two places beside a chair where the cat can climb on: just left of its left side, just right of its right side
+const sideCache = {};
+function seatSides(d) {
+  if (sideCache[d.chair]) return sideCache[d.chair];
+  const [FL, FR, BR, BL] = FOOT[d.chair], ul = Math.hypot(FR[0] - FL[0], FR[1] - FL[1]), ux = (FR[0] - FL[0]) / ul, uy = (FR[1] - FL[1]) / ul;
+  const L = [(FL[0] + BL[0]) / 2 - ux * 44, (FL[1] + BL[1]) / 2 - uy * 44], R = [(FR[0] + BR[0]) / 2 + ux * 44, (FR[1] + BR[1]) / 2 + uy * 44];
+  return (sideCache[d.chair] = [L, R].map(p => cellC(...nearestFree(...cellOf(p[0], p[1])))));
+}
+const pathLen = p => { let L = 0; for (let i = 1; i < (p || []).length; i++) L += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); return p ? L : Infinity; };
 function goDesk(d) {
-  walkTo(d.stand[0], d.stand[1], () => { hopTo(d.seat[0], d.seat[1] + 1, () => { cat.desk = d; cat.mode = "sit"; sfx("tick"); openSubject(d.s); }); });
+  leaveSeat();
+  const [L, R] = seatSides(d), side = pathLen(astar(cat.x, cat.y, ...L)) <= pathLen(astar(cat.x, cat.y, ...R)) ? L : R;
+  walkTo(side[0], side[1], () => { cat.side = side; hopTo(d.seat[0], d.seat[1] + 1, () => { cat.desk = d; cat.mode = "sit"; sfx("tick"); openSubject(d.s); }); });
   hint(`走去${d.s}桌…`);
 }
 const sheet = $id("sheet"), sheetBody = $id("sheetBody"); let sheetOpen = false;
@@ -676,6 +750,7 @@ function sfx(type) {
 $id("fs").onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch (e) { toast("這個畫面不支援全螢幕，可以把手機轉橫看看"); } setTimeout(resize, 300); };
 if (!document.fullscreenEnabled) $id("fs").hidden = true;
 $id("snd").onclick = () => { soundOn = !soundOn; $id("snd").textContent = soundOn ? "🔊" : "🔇"; };
+$id("wx").onclick = () => { const i = WEATHERS.findIndex(x => x.id === weather), W = WEATHERS[(i + 1) % WEATHERS.length]; setWeather(W.id, true); toast(`窗外變成${W.nm}了`); };
 const DAYS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
 function tickClock() { const d = new Date(); $id("clock").textContent = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; $id("dayname").textContent = DAYS[d.getDay()]; }
 
